@@ -1,0 +1,147 @@
+{
+  "main": {
+    "id": "f6618a34d3c04040",
+    "type": "split",
+    "children": [
+      {
+        "id": "4ab52b9f9ea7ec29",
+        "type": "leaf",
+        "state": {
+          "type": "markdown",
+          "state": {
+            "file": "notes/Purchases.md",
+            "mode": "preview",
+            "backlinks": false,
+            "source": true
+          }
+        }
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b05f1de994fdc4ca",
+    "type": "split",
+    "children": [
+      {
+        "id": "816f8904127008f4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "79fd365198eb7525",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {}
+            }
+          },
+          {
+            "id": "24777aae788bab4a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "atmel",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": true,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "43562dc510262867",
+            "type": "leaf",
+            "state": {
+              "type": "starred",
+              "state": {}
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "horizontal",
+    "width": 366.5
+  },
+  "right": {
+    "id": "c0c36ab0a2579a29",
+    "type": "split",
+    "children": [
+      {
+        "id": "eac8f21f9705925e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "327f94d8c5d4d06b",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "notes/Purchases.md",
+                "collapseAll": true,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": true,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": false
+              }
+            }
+          },
+          {
+            "id": "b2d4525fc56bd05b",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "notes/Purchases.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": false
+              }
+            }
+          },
+          {
+            "id": "8f0f43f0e789029b",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "alphabetical",
+                "useHierarchy": true
+              }
+            }
+          },
+          {
+            "id": "142dcea7c800f9c5",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "notes/Purchases.md"
+              }
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "active": "4ab52b9f9ea7ec29",
+  "lastOpenFiles": [
+    "notes/query-work-journal.md",
+    "work-journal/202210201410.md",
+    "notes/home page.md",
+    "inbox/Read.md",
+    "notes/query-math.md",
+    "work-journal/202210201229.md",
+    "inbox/ampdac.md",
+    "notes/Purchases.md",
+    "inbox/Christmas.md",
+    "inbox/del-divergence-curl.md"
+  ]
+}

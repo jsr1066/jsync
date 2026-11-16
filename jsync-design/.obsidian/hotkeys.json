@@ -1,0 +1,24 @@
+{
+  "app:go-back": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "ArrowLeft"
+    }
+  ],
+  "app:go-forward": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "ArrowRight"
+    }
+  ],
+  "open-with-default-app:open": [
+    {
+      "modifiers": [],
+      "key": "F10"
+    }
+  ]
+}

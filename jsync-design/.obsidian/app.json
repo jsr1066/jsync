@@ -1,0 +1,26 @@
+{
+  "trashOption": "local",
+  "livePreview": true,
+  "newFileLocation": "folder",
+  "vimMode": false,
+  "promptDelete": false,
+  "alwaysUpdateLinks": true,
+  "foldHeading": false,
+  "foldIndent": false,
+  "fileSortOrder": "alphabetical",
+  "newFileFolderPath": "inbox",
+  "defaultViewMode": "preview",
+  "attachmentFolderPath": "inbox",
+  "pdfExportSettings": {
+    "includeName": true,
+    "pageSize": "Letter",
+    "landscape": false,
+    "margin": "0",
+    "downscalePercent": 100
+  },
+  "showLineNumber": false,
+  "spellcheck": false,
+  "showInlineTitle": false,
+  "showFrontmatter": true,
+  "propertiesInDocument": "hidden"
+}

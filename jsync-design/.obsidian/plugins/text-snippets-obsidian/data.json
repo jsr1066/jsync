@@ -1,0 +1,23 @@
+{
+  "snippets_file": "span : <span style=\"\"> TEXT</span>\nsspan : <span style=\"font-size:20px;\"> TEXT</span>\nbspan : <span style=\"\">\nespan : </span>\nsize : font-size:20px;\nblue : color:blue;\nred : color:red;\ngreen : color:green;\ncenter : text-align:center\nright : text-align:right",
+  "snippets": [
+    "span : <span style=\"\"> TEXT</span>",
+    "sspan : <span style=\"font-size:20px;\"> TEXT</span>",
+    "bspan : <span style=\"\">",
+    "espan : </span>",
+    "size : font-size:20px;",
+    "blue : color:blue;",
+    "red : color:red;",
+    "green : color:green;",
+    "center : text-align:center",
+    "right : text-align:right"
+  ],
+  "endSymbol": "$end$",
+  "newlineSymbol": "$nl$",
+  "stopSymbol": "$tb$",
+  "pasteSymbol": "$pst$",
+  "useTab": true,
+  "useSpace": false,
+  "wordDelimiters": "$()[]{}<>,.!?;:'\"\\/",
+  "isWYSIWYG": true
+}

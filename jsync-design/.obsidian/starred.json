@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "type": "file",
+      "title": "home page",
+      "path": "notes/home page.md"
+    },
+    {
+      "type": "file",
+      "title": "mark-down-tips",
+      "path": "notes/mark-down-tips.md"
+    },
+    {
+      "type": "file",
+      "title": "electronics-MOC",
+      "path": "notes/electronics-MOC.md"
+    },
+    {
+      "type": "file",
+      "title": "math-MOC",
+      "path": "notes/math-MOC.md"
+    },
+    {
+      "type": "file",
+      "title": "Purchases",
+      "path": "notes/Purchases.md"
+    },
+    {
+      "type": "file",
+      "title": "query-journal",
+      "path": "notes/query-journal.md"
+    }
+  ]
+}
