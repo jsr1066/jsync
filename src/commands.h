@@ -11,7 +11,8 @@ namespace jsync_ns
     {
     public:
         ExpectBool scan(const std::string& directory, const std::vector<std::string>& excludes, std::vector<ScanInfo>& results);
-        ExpectBool hash(std::string& directory, std::string& rpath, std::string& hash);
+        // Computes the SHA-1 of directory/rpath; hash receives 40 lowercase hex chars.
+        ExpectBool hash(const std::string& directory, const std::string& rpath, std::string& hash);
         ExpectReadContext open(std::string& directory , std::string& rpath);
         ExpectBool read(const ReadContext&, Chunk&);
     };

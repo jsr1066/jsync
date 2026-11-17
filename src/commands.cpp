@@ -4,9 +4,13 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <regex>
+#include <vector>
 
 #include <sys/stat.h>
+
+#include "sha1.h"
 
 namespace fs = std::filesystem;
 
@@ -84,6 +88,52 @@ namespace jsync_ns
         std::sort(results.begin(), results.end(),
             [](const ScanInfo& a, const ScanInfo& b) { return a.rpath < b.rpath; });
 
+        return true;
+    }
+
+    ExpectBool Commands::hash(const std::string& directory, const std::string& rpath, std::string& hash)
+    {
+        hash.clear();
+
+        const fs::path rel(rpath);
+        if (rel.empty() || rel.is_absolute()
+            || std::any_of(rel.begin(), rel.end(), [](const fs::path& part) { return part == ".."; }))
+        {
+            return std::unexpected(Error{"invalid relative path: " + rpath, EINVAL});
+        }
+
+        const fs::path full = fs::path(directory) / rel;
+        struct stat st;
+        if (::stat(full.c_str(), &st) != 0)
+        {
+            int code = errno;
+            return std::unexpected(Error{"cannot stat " + full.string() + ": " + std::strerror(code), code});
+        }
+        if (!S_ISREG(st.st_mode))
+        {
+            return std::unexpected(Error{"not a regular file: " + full.string(), EINVAL});
+        }
+
+        std::ifstream in(full, std::ios::binary);
+        if (!in)
+        {
+            int code = errno ? errno : EIO;
+            return std::unexpected(Error{"cannot open " + full.string() + ": " + std::strerror(code), code});
+        }
+
+        Sha1 sha;
+        std::vector<char> buf(64 * 1024);
+        while (in)
+        {
+            in.read(buf.data(), buf.size());
+            sha.update(buf.data(), static_cast<size_t>(in.gcount()));
+        }
+        if (in.bad())
+        {
+            return std::unexpected(Error{"read error on " + full.string(), EIO});
+        }
+
+        hash = sha.hex_digest();
         return true;
     }
 }

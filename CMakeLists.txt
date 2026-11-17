@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(jsync_core
     src/commands.cpp
+    src/sha1.cpp
 )
 target_include_directories(jsync_core PUBLIC src)
 target_compile_options(jsync_core PRIVATE -Wall -Wextra)
