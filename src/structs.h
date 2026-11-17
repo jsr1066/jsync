@@ -27,7 +27,7 @@ namespace jsync_ns
         size_t total_size;
     }
 
-    const_expr size_t MAX_CHUNK = 4096;
+    const_expr size_t MAX_CHUNK = 1024*512;
 
     struct Chunk
     {
