@@ -23,12 +23,18 @@ namespace jsync_ns
         // chunk holds data (call again for more), false at EOF (chunk_size == 0).
         ExpectBool read(const IOContext& context, Chunk& chunk);
 
-        // Opens directory/rpath for writing. The returned context owns the fd
-        // and closes it when destroyed.
-        ExpectIOContext wopen(const std::string& directory, const std::string& rpath);
+        // Opens a temp file next to directory/rpath for writing (creating parent
+        // directories as needed). The file must end up total_size bytes long with
+        // SHA-1 expected_hash. The returned context owns the fd and closes it
+        // when destroyed.
+        ExpectIOContext wopen(const std::string& directory, const std::string& rpath,
+                              size_t total_size, const std::string& expected_hash);
 
-        // Writes the data in chunk
-        ExpectBool write(const IOContext& context, Chunk& chunk);
+        // Appends the data in chunk to the temp file and updates the running hash.
+        // Returns true if more data is expected. Once total_size bytes have been
+        // written it verifies the hash and returns false; on a mismatch the temp
+        // file is removed and an error is returned.
+        ExpectBool write(IOContext& context, const Chunk& chunk);
 
         // Renames the tempfile to the proper name
         ExpectBool rename(const std::string& directory, const std::string& rpath);

@@ -8,6 +8,8 @@
 
 #include <unistd.h>
 
+#include "sha1.h"
+
 namespace jsync_ns
 {
     struct Error
@@ -34,6 +36,14 @@ namespace jsync_ns
         std::string rpath;
         size_t total_size = 0;
 
+        // Write state (unused when reading): the hash the finished file must
+        // have, the bytes and running hash accumulated so far, and the temp file
+        // being written.
+        std::string expected_hash;
+        size_t bytes_done = 0;
+        Sha1 sha;
+        std::string temp_path;
+
         IOContext() = default;
         IOContext(const IOContext&) = delete;
         IOContext& operator=(const IOContext&) = delete;
@@ -42,6 +52,10 @@ namespace jsync_ns
             , directory(std::move(other.directory))
             , rpath(std::move(other.rpath))
             , total_size(other.total_size)
+            , expected_hash(std::move(other.expected_hash))
+            , bytes_done(other.bytes_done)
+            , sha(other.sha)
+            , temp_path(std::move(other.temp_path))
         {
             other.fd = -1;
         }
@@ -57,6 +71,10 @@ namespace jsync_ns
                 directory = std::move(other.directory);
                 rpath = std::move(other.rpath);
                 total_size = other.total_size;
+                expected_hash = std::move(other.expected_hash);
+                bytes_done = other.bytes_done;
+                sha = other.sha;
+                temp_path = std::move(other.temp_path);
                 other.fd = -1;
             }
             return *this;

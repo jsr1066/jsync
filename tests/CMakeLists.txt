@@ -12,3 +12,8 @@ add_executable(test_read test_read.cpp)
 target_link_libraries(test_read PRIVATE jsync_core)
 target_compile_options(test_read PRIVATE -Wall -Wextra)
 add_test(NAME read COMMAND test_read)
+
+add_executable(test_write test_write.cpp)
+target_link_libraries(test_write PRIVATE jsync_core)
+target_compile_options(test_write PRIVATE -Wall -Wextra)
+add_test(NAME write COMMAND test_write)

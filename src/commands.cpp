@@ -28,6 +28,13 @@ namespace jsync_ns
             return std::unexpected(std::move(error));
         }
 
+        // The temp file written for rpath: same directory, so rename() stays on
+        // one filesystem.
+        fs::path temp_path_for(const fs::path& full)
+        {
+            return full.parent_path() / ("." + full.filename().string() + ".jsync.tmp");
+        }
+
         // Joins directory and rpath, rejecting empty, absolute and ".." paths so a
         // remote client cannot reach outside directory.
         std::expected<fs::path, Error> resolve_path(const std::string& directory, const std::string& rpath)
@@ -234,5 +241,96 @@ namespace jsync_ns
 
         chunk.chunk_size = filled;
         return filled > 0;
+    }
+
+    ExpectIOContext Commands::wopen(const std::string& directory, const std::string& rpath,
+                                    size_t total_size, const std::string& expected_hash)
+    {
+        spdlog::info("wopen: directory={} rpath={} total_size={}", directory, rpath, total_size);
+
+        auto resolved = resolve_path(directory, rpath);
+        if (!resolved)
+        {
+            return fail("wopen", resolved.error());
+        }
+        const fs::path temp = temp_path_for(*resolved);
+
+        std::error_code ec;
+        fs::create_directories(temp.parent_path(), ec);
+        if (ec)
+        {
+            return fail("wopen", Error{"cannot create directory " + temp.parent_path().string() + ": " + ec.message(), ec.value()});
+        }
+
+        IOContext context;
+        context.fd = ::open(temp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+        if (context.fd < 0)
+        {
+            int code = errno;
+            return fail("wopen", Error{"cannot open " + temp.string() + ": " + std::strerror(code), code});
+        }
+
+        context.directory = directory;
+        context.rpath = rpath;
+        context.total_size = total_size;
+        context.expected_hash = expected_hash;
+        context.temp_path = temp.string();
+        return std::move(context);
+    }
+
+    ExpectBool Commands::write(IOContext& context, const Chunk& chunk)
+    {
+        spdlog::debug("write: directory={} rpath={} chunk={}", context.directory, context.rpath, chunk.chunk_size);
+
+        if (context.fd < 0)
+        {
+            return fail("write", Error{"write on closed context", EBADF});
+        }
+        if (chunk.chunk_size > MAX_CHUNK
+            || chunk.chunk_size > context.total_size - context.bytes_done)
+        {
+            return fail("write", Error{"too much data for " + context.rpath, EFBIG});
+        }
+
+        size_t written = 0;
+        while (written < chunk.chunk_size)
+        {
+            ssize_t n = ::write(context.fd, chunk.bytes + written, chunk.chunk_size - written);
+            if (n < 0)
+            {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                int code = errno;
+                return fail("write", Error{"write error on " + context.temp_path + ": " + std::strerror(code), code});
+            }
+            written += static_cast<size_t>(n);
+        }
+        context.sha.update(chunk.bytes, chunk.chunk_size);
+        context.bytes_done += chunk.chunk_size;
+
+        if (context.bytes_done < context.total_size)
+        {
+            return true;
+        }
+
+        // Complete: verify before the caller may rename the temp file into place.
+        const std::string actual = context.sha.hex_digest();
+        if (actual != context.expected_hash)
+        {
+            ::close(context.fd);
+            context.fd = -1;
+            ::unlink(context.temp_path.c_str());
+            return fail("write", Error{"hash mismatch on " + context.rpath + ": expected " + context.expected_hash + ", got " + actual, EBADMSG});
+        }
+        if (::fsync(context.fd) != 0 || ::close(context.fd) != 0)
+        {
+            int code = errno;
+            context.fd = -1;
+            return fail("write", Error{"cannot flush " + context.temp_path + ": " + std::strerror(code), code});
+        }
+        context.fd = -1;
+        return false;
     }
 }

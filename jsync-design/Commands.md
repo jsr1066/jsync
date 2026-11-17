@@ -37,30 +37,25 @@ RSP-HASH:directory=\<path\>;file=\<relative-path\>;hash=\<hash\>
 ## request
 REQ-READ:directory=\<path\>;file=\<relative-path\>
 ## response
-RSP-READ:directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
+RSP-READ-CHUNK:directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
 .
 .
 .
-RSP-READ:directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
+RSP-READ:directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
 
 # Write file
 ## request
-REQ-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
+REQ-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>;hash=\<hash\>
 chunck bytes
-REQ-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
+REQ-WRITE-CHUNK:directory=\<path\>;file=\<relative-path\>;chunk=\<size\>
 chunck bytes
 .
 .
 .
-REQ-WRITE:directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
+REQ-WRITE-CHUNK:directory=\<path\>;file=\<relative-path\>;status=complete;
 ## response
 RSP-WRITE:directory=\<path\>;file=\<relative-path\>size=\<size\>;hash=\<hash\>;status=compete;text=<text_if_error>
 
-# Rename temp
-## request
-REQ-RENAME:directory=\<path\>;file=\<relative-path\>;
-## response
-RSP-RENAME:status=complete;text=<text_if_error>
 # Delete
 ## request
 REQ-DELETE:directory=\<path\>;file=\<relative-path\>
