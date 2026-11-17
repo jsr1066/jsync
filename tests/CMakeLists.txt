@@ -17,3 +17,8 @@ add_executable(test_write test_write.cpp)
 target_link_libraries(test_write PRIVATE jsync_core)
 target_compile_options(test_write PRIVATE -Wall -Wextra)
 add_test(NAME write COMMAND test_write)
+
+add_executable(test_peer test_peer.cpp)
+target_link_libraries(test_peer PRIVATE jsync_core)
+target_compile_options(test_peer PRIVATE -Wall -Wextra)
+add_test(NAME peer COMMAND test_peer)
