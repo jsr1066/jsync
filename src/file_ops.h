@@ -7,7 +7,7 @@
 
 namespace jsync_ns
 {
-    class Commands
+    class FileOps
     {
     public:
         ExpectBool scan(const std::string& directory, const std::vector<std::string>& excludes, std::vector<ScanInfo>& results);
@@ -39,9 +39,5 @@ namespace jsync_ns
         // Renames the tempfile to the proper name
         ExpectBool rename(const std::string& directory, const std::string& rpath);
     };
-
-    std::string tokv(const ScanInfo&);
-    std::string tokv(const Chunk&);
-
 }
 

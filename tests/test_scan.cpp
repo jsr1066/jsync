@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "file_ops.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -43,7 +43,7 @@ int main()
     fs::permissions(root / "a.txt", fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read);
     fs::create_symlink("a.txt", root / "link");
 
-    Commands cmd;
+    FileOps cmd;
     std::vector<ScanInfo> results;
 
     // No excludes: all regular files, sorted, symlink skipped.

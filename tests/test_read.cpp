@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "file_ops.h"
 
 #include <cerrno>
 #include <filesystem>
@@ -33,7 +33,7 @@ static std::string make_data(size_t n)
 }
 
 // Reads the whole file through ropen()/read(); returns the contents and chunk count.
-static bool read_all(Commands& cmd, const std::string& dir, const std::string& rpath,
+static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rpath,
                      std::string& out, int& chunks, size_t& total)
 {
     auto ctx = cmd.ropen(dir, rpath);
@@ -78,7 +78,7 @@ int main()
     write_file(root / "sub/exact", exact);
     write_file(root / "multi", multi);
 
-    Commands cmd;
+    FileOps cmd;
     std::string out;
     int chunks = 0;
     size_t total = 0;

@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(spdlog REQUIRED)
 
 add_library(jsync_core
-    src/commands.cpp
+    src/file_ops.cpp
     src/sha1.cpp
 )
 target_include_directories(jsync_core PUBLIC src)

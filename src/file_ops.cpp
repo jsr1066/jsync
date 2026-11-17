@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "file_ops.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -49,7 +49,7 @@ namespace jsync_ns
         }
     }
 
-    ExpectBool Commands::scan(const std::string& directory, const std::vector<std::string>& excludes, std::vector<ScanInfo>& results)
+    ExpectBool FileOps::scan(const std::string& directory, const std::vector<std::string>& excludes, std::vector<ScanInfo>& results)
     {
         spdlog::info("scan: directory={} excludes={}", directory, excludes.size());
         results.clear();
@@ -125,7 +125,7 @@ namespace jsync_ns
         return true;
     }
 
-    ExpectBool Commands::hash(const std::string& directory, const std::string& rpath, std::string& hash)
+    ExpectBool FileOps::hash(const std::string& directory, const std::string& rpath, std::string& hash)
     {
         spdlog::info("hash: directory={} rpath={}", directory, rpath);
         hash.clear();
@@ -170,7 +170,7 @@ namespace jsync_ns
         return true;
     }
 
-    ExpectIOContext Commands::ropen(const std::string& directory, const std::string& rpath)
+    ExpectIOContext FileOps::ropen(const std::string& directory, const std::string& rpath)
     {
         spdlog::info("ropen: directory={} rpath={}", directory, rpath);
         auto resolved = resolve_path(directory, rpath);
@@ -205,7 +205,7 @@ namespace jsync_ns
         return std::move(context);
     }
 
-    ExpectBool Commands::read(const IOContext& context, Chunk& chunk)
+    ExpectBool FileOps::read(const IOContext& context, Chunk& chunk)
     {
         spdlog::debug("read: directory={} rpath={}", context.directory, context.rpath);
         chunk.directory = context.directory;
@@ -243,7 +243,7 @@ namespace jsync_ns
         return filled > 0;
     }
 
-    ExpectIOContext Commands::wopen(const std::string& directory, const std::string& rpath,
+    ExpectIOContext FileOps::wopen(const std::string& directory, const std::string& rpath,
                                     size_t total_size, const std::string& expected_hash)
     {
         spdlog::info("wopen: directory={} rpath={} total_size={}", directory, rpath, total_size);
@@ -278,7 +278,7 @@ namespace jsync_ns
         return std::move(context);
     }
 
-    ExpectBool Commands::write(IOContext& context, const Chunk& chunk)
+    ExpectBool FileOps::write(IOContext& context, const Chunk& chunk)
     {
         spdlog::debug("write: directory={} rpath={} chunk={}", context.directory, context.rpath, chunk.chunk_size);
 
@@ -334,7 +334,7 @@ namespace jsync_ns
         return false;
     }
 
-    ExpectBool Commands::rename(const std::string& directory, const std::string& rpath)
+    ExpectBool FileOps::rename(const std::string& directory, const std::string& rpath)
     {
         spdlog::info("rename: directory={} rpath={}", directory, rpath);
 

@@ -37,7 +37,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Commands.md",
+                "file": "overview.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -52,10 +52,11 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Commands"
+              "title": "overview"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -182,7 +183,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Commands.md",
+                "file": "overview.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -242,7 +243,7 @@
             "state": {
               "type": "file-properties",
               "state": {
-                "file": "Commands.md"
+                "file": "overview.md"
               },
               "icon": "lucide-info",
               "title": "File properties"
@@ -280,12 +281,12 @@
       "workspaces:Manage workspace layouts": false
     }
   },
-  "active": "c124d39567d2f2cc",
+  "active": "adb0fec5f80d5cde",
   "lastOpenFiles": [
+    "Operation.md",
     "implementation.md",
     "Commands.md",
     "overview.md",
-    "Operation.md",
     "journal/Had a party for Maegans birthday yesterday. Judy, Sam&Eric and maegans friend.md",
     "inbox/Christmas.md",
     "journal/Finished The Norman Conquest.md",

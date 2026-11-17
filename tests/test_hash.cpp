@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "file_ops.h"
 
 #include <filesystem>
 #include <fstream>
@@ -32,7 +32,7 @@ int main()
     // One million 'a' characters: standard FIPS test vector, spans many blocks and buffer reads.
     write_file(root / "million_a", std::string(1000000, 'a'));
 
-    Commands cmd;
+    FileOps cmd;
     std::string h;
 
     auto check_hash = [&](const std::string& rpath, const std::string& expected)

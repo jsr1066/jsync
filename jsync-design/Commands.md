@@ -3,6 +3,7 @@ This describes the wire protocol for each command. The protocol is an ASCII base
 The commands that take a directory=\<...\> and file=\<relative-path\> are in the remote server file paths. It is the responsibilty of the client to convert into local paths.
 
 KV fields
+The value are all transmitted in ASCII, no binary except for the file chunks.
 
 | fieldname  | value                 | Note                                 |
 | ---------- | --------------------- | ------------------------------------ |

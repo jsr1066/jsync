@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "file_ops.h"
 
 #include <filesystem>
 #include <fstream>
@@ -38,7 +38,7 @@ static std::string slurp(const fs::path& p)
 }
 
 // Feeds data to write() in pieces of `piece` bytes; returns the last result.
-static ExpectBool write_all(Commands& cmd, IOContext& ctx, const std::string& data, size_t piece)
+static ExpectBool write_all(FileOps& cmd, IOContext& ctx, const std::string& data, size_t piece)
 {
     auto chunk = std::make_unique<Chunk>();
     ExpectBool result = true;
@@ -59,7 +59,7 @@ int main()
     const fs::path root = fs::temp_directory_path() / "jsync_test_write";
     fs::remove_all(root);
     fs::create_directories(root);
-    Commands cmd;
+    FileOps cmd;
     const std::string dir = root.string();
 
     // Multi-chunk write into a new subdirectory.
