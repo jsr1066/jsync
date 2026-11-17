@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <ctime>
 #include <expected>
+#include <string>
 
 namespace jsync_ns
 {
@@ -12,8 +15,8 @@ namespace jsync_ns
 
     struct ScanInfo
     {
-        std::string directory
-        std::string rpath
+        std::string directory;
+        std::string rpath;
         int permission;
         size_t size;
         time_t mtime;
@@ -25,9 +28,9 @@ namespace jsync_ns
         std::string directory;
         std::string rpath;
         size_t total_size;
-    }
+    };
 
-    const_expr size_t MAX_CHUNK = 1024*512;
+    constexpr size_t MAX_CHUNK = 1024*512;
 
     struct Chunk
     {
@@ -36,11 +39,11 @@ namespace jsync_ns
         size_t total_size;
         size_t chunk_size;
         char bytes[MAX_CHUNK];
-    }
+    };
 
     using ExpectBool = std::expected<bool, Error>;
-    using ExpectReadContext = std::expected<bool, ReadContext>;
-    using ExpectChunk = std::expected<bool, Chunk>;
+    using ExpectReadContext = std::expected<ReadContext, Error>;
+    using ExpectChunk = std::expected<Chunk, Error>;
 
 }
 
