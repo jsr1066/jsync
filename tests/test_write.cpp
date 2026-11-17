@@ -112,6 +112,26 @@ int main()
         CHECK(!r.has_value());
     }
 
+    // rename() moves the verified temp file over the target, replacing it.
+    {
+        { std::ofstream(root / "small", std::ios::binary) << "old contents"; }
+        auto r = cmd.rename(dir, "small");
+        CHECK(r.has_value() && *r);
+        CHECK(!fs::exists(root / ".small.jsync.tmp"));
+        CHECK(slurp(root / "small") == make_data(1000));
+
+        r = cmd.rename(dir, "sub/big");
+        CHECK(r.has_value());
+        CHECK(slurp(root / "sub" / "big") == make_data(MAX_CHUNK * 2 + 123));
+    }
+
+    // rename() errors: no temp file, bad paths.
+    CHECK(!cmd.rename(dir, "small").has_value());
+    CHECK(!cmd.rename(dir, "nope").has_value());
+    CHECK(!cmd.rename(dir, "../x").has_value());
+    CHECK(!cmd.rename(dir, "/etc/x").has_value());
+    CHECK(!cmd.rename(dir, "").has_value());
+
     // wopen() path errors.
     CHECK(!cmd.wopen(dir, "../x", 0, "").has_value());
     CHECK(!cmd.wopen(dir, "/etc/x", 0, "").has_value());

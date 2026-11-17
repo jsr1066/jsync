@@ -333,4 +333,26 @@ namespace jsync_ns
         context.fd = -1;
         return false;
     }
+
+    ExpectBool Commands::rename(const std::string& directory, const std::string& rpath)
+    {
+        spdlog::info("rename: directory={} rpath={}", directory, rpath);
+
+        auto resolved = resolve_path(directory, rpath);
+        if (!resolved)
+        {
+            return fail("rename", resolved.error());
+        }
+        const fs::path& full = *resolved;
+        const fs::path temp = temp_path_for(full);
+
+        // rename(2) atomically replaces an existing file; the temp file is in the
+        // same directory so this never crosses filesystems.
+        if (::rename(temp.c_str(), full.c_str()) != 0)
+        {
+            int code = errno;
+            return fail("rename", Error{"cannot rename " + temp.string() + " to " + full.string() + ": " + std::strerror(code), code});
+        }
+        return true;
+    }
 }
