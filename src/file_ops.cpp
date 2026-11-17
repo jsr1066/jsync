@@ -202,7 +202,7 @@ namespace jsync_ns
         context.directory = directory;
         context.rpath = rpath;
         context.total_size = static_cast<size_t>(st.st_size);
-        return std::move(context);
+        return context;
     }
 
     ExpectBool FileOps::read(const IOContext& context, Chunk& chunk)
@@ -275,7 +275,7 @@ namespace jsync_ns
         context.total_size = total_size;
         context.expected_hash = expected_hash;
         context.temp_path = temp.string();
-        return std::move(context);
+        return context;
     }
 
     ExpectBool FileOps::write(IOContext& context, const Chunk& chunk)
