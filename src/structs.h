@@ -25,19 +25,19 @@ namespace jsync_ns
         time_t mtime;
     };
 
-    // State for reading a file chunk by chunk. Owns the file descriptor and
+    // State for reading or writing  a file chunk by chunk. Owns the file descriptor and
     // closes it on destruction, so it is move-only.
-    struct ReadContext
+    struct IOContext
     {
         int fd = -1;
         std::string directory;
         std::string rpath;
         size_t total_size = 0;
 
-        ReadContext() = default;
-        ReadContext(const ReadContext&) = delete;
-        ReadContext& operator=(const ReadContext&) = delete;
-        ReadContext(ReadContext&& other) noexcept
+        IOContext() = default;
+        IOContext(const IOContext&) = delete;
+        IOContext& operator=(const IOContext&) = delete;
+        IOContext(IOContext&& other) noexcept
             : fd(other.fd)
             , directory(std::move(other.directory))
             , rpath(std::move(other.rpath))
@@ -45,7 +45,7 @@ namespace jsync_ns
         {
             other.fd = -1;
         }
-        ReadContext& operator=(ReadContext&& other) noexcept
+        IOContext& operator=(IOContext&& other) noexcept
         {
             if (this != &other)
             {
@@ -61,7 +61,7 @@ namespace jsync_ns
             }
             return *this;
         }
-        ~ReadContext()
+        ~IOContext()
         {
             if (fd >= 0)
             {
@@ -82,7 +82,7 @@ namespace jsync_ns
     };
 
     using ExpectBool = std::expected<bool, Error>;
-    using ExpectReadContext = std::expected<ReadContext, Error>;
+    using ExpectIOContext = std::expected<IOContext, Error>;
     using ExpectChunk = std::expected<Chunk, Error>;
 
 }

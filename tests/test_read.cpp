@@ -32,11 +32,11 @@ static std::string make_data(size_t n)
     return s;
 }
 
-// Reads the whole file through open()/read(); returns the contents and chunk count.
+// Reads the whole file through ropen()/read(); returns the contents and chunk count.
 static bool read_all(Commands& cmd, const std::string& dir, const std::string& rpath,
                      std::string& out, int& chunks, size_t& total)
 {
-    auto ctx = cmd.open(dir, rpath);
+    auto ctx = cmd.ropen(dir, rpath);
     if (!ctx)
     {
         return false;
@@ -95,21 +95,21 @@ int main()
     CHECK(read_all(cmd, root.string(), "multi", out, chunks, total));
     CHECK(out == multi && chunks == 3 && total == multi.size());
 
-    // open() errors.
-    CHECK(!cmd.open(root.string(), "nope").has_value());
-    CHECK(!cmd.open(root.string(), "sub").has_value());        // directory
-    CHECK(!cmd.open(root.string(), "../small").has_value());   // traversal
-    CHECK(!cmd.open(root.string(), "/etc/hosts").has_value()); // absolute
-    CHECK(!cmd.open(root.string(), "").has_value());
+    // ropen() errors.
+    CHECK(!cmd.ropen(root.string(), "nope").has_value());
+    CHECK(!cmd.ropen(root.string(), "sub").has_value());        // directory
+    CHECK(!cmd.ropen(root.string(), "../small").has_value());   // traversal
+    CHECK(!cmd.ropen(root.string(), "/etc/hosts").has_value()); // absolute
+    CHECK(!cmd.ropen(root.string(), "").has_value());
 
     // Context owns the fd: it is closed on destruction and a moved-from context is inert.
     {
-        auto ctx = cmd.open(root.string(), "small");
+        auto ctx = cmd.ropen(root.string(), "small");
         CHECK(ctx.has_value());
         int fd = ctx->fd;
         CHECK(fd >= 0);
         {
-            ReadContext moved = std::move(*ctx);
+            IOContext moved = std::move(*ctx);
             CHECK(ctx->fd == -1);
             CHECK(moved.fd == fd);
         }

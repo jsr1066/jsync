@@ -1,52 +1,71 @@
-All commands that take a directory=<...> and file=\<relative-path\> are in the remote server file paths. It is the responsibilty of the client to convert into local paths
+This describes the wire protocol for each command. The protocol is an ASCII based semi-colon delimited key=value pairs on a single line. 
+
+The commands that take a directory=\<...\> and file=\<relative-path\> are in the remote server file paths. It is the responsibilty of the client to convert into local paths.
+
+KV fields
+
+| fieldname  | value                 | Note                                 |
+| ---------- | --------------------- | ------------------------------------ |
+| directory  | string                | Specifies the server side directory  |
+| file       | string                | The relative path to the directory   |
+| exclude    | regex                 | Pattern of files to exclude          |
+| hash       | hex                   | File hash                            |
+| total_size | int                   | Size of file                         |
+| chunk_size | int                   | Size of file data following the line |
+| status     | "complete"<br>"error" | Completion status<br>                |
+| text       | string                | Error message                        |
+| mtime      | int                   | time_t value for modification time   |
+| permission | int                   | file permission                      |
+
 
 # SCAN
 ## request
-SCAN:directory=path;\[exclude=regex;...\]
+REQ-SCAN:directory=path;\[exclude=regex;...\]
 ## response
-SCAN:file=\<relative-path\>;size=\<size\>;mtime=\<mtime\>;permission=\<permission\>
+RSP-SCAN:file=\<relative-path\>;size=\<size\>;mtime=\<mtime\>;permission=\<permission\>
 .
 .
 .
-SCAN:status=complete
+RSP-SCAN:status=complete;text=<text_if_required>
 # HASH
 ## request
-HASH:directory=\<path\>;file=\<relative-path\>
+REQ-HASH:directory=\<path\>;file=\<relative-path\>
 ## response
-HASH:directory=\<path\>;file=\<relative-path\>;hash=\<hash\>
+RSP-HASH:directory=\<path\>;file=\<relative-path\>;hash=\<hash\>
 # Read file
+
 ## request
-READ:directory=\<path\>;file=\<relative-path\>
+REQ-READ:directory=\<path\>;file=\<relative-path\>
 ## response
-READ:directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
+RSP-READ:directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
 .
 .
 .
-READ:directory=\<path\>;file=\<relative-path\>;status=complete
+RSP-READ:directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
 
 # Write file
 ## request
-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
+REQ-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
 chunck bytes
-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
+REQ-WRITE:directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>
 chunck bytes
 .
 .
 .
-WRITE:directory=\<path\>;file=\<relative-path\>;status=complete
+REQ-WRITE:directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
 ## response
-WRITE:directory=\<path\>;file=\<relative-path\>;status=complete;size=\<size\>;hash=\<hash\>
+RSP-WRITE:directory=\<path\>;file=\<relative-path\>size=\<size\>;hash=\<hash\>;status=compete;text=<text_if_error>
 
 # Rename temp
 ## request
-RENAME:directory=\<path\>;file=\<relative-path\>;
+REQ-RENAME:directory=\<path\>;file=\<relative-path\>;
 ## response
-RENAME:status=complete
+RSP-RENAME:status=complete;text=<text_if_error>
 # Delete
 ## request
-DELETE:directory=\<path\>;file=\<relative-path\>
+REQ-DELETE:directory=\<path\>;file=\<relative-path\>
 ## response
-DELETE:directory=\<path\>;file=\<relative-path\>;status=complete
+RSP-DELETE:directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
 
 
 
