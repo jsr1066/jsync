@@ -5,6 +5,7 @@
 #include <expected>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <unistd.h>
 
@@ -25,6 +26,13 @@ namespace jsync_ns
         int permission;
         size_t size;
         time_t mtime;
+    };
+
+    // REQ-SCAN: the server directory to scan and regexes of files to skip.
+    struct ScanRequest
+    {
+        std::string directory;
+        std::vector<std::string> excludes;
     };
 
     // State for reading or writing  a file chunk by chunk. Owns the file descriptor and

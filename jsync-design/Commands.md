@@ -19,12 +19,13 @@ The JS tag can be used to check alignment and the length will indicate the next 
 
 | fieldname  | value                 | Note                                 |
 | ---------- | --------------------- | ------------------------------------ |
+| cmd        | string                | The command                          |
 | directory  | string                | Specifies the server side directory  |
 | file       | string                | The relative path to the directory   |
 | exclude    | regex                 | Pattern of files to exclude          |
 | hash       | hex                   | File hash                            |
-| total_size | int                   | Size of file                         |
-| chunk_size | int                   | Size of file data following the line |
+| total_size | size_t                | Size of file                         |
+| chunk_size | size_t                | Size of file data following the line |
 | status     | "complete"<br>"error" | Completion status<br>                |
 | text       | string                | Error message                        |
 | mtime      | int                   | time_t value for modification time   |
@@ -33,47 +34,47 @@ The JS tag can be used to check alignment and the length will indicate the next 
 
 # SCAN
 ## request
-JS1.0;\<length\>;REQ-SCAN;directory=path;\[exclude=regex;...\]
+JS1.0;\<length\>;cmd=REQ-SCAN;directory=path;\[exclude=regex\<0x1f\>regex...\]
 ## response
-JS1.0;\<length\>;RSP-SCAN;file=\<relative-path\>;size=\<size\>;mtime=\<mtime\>;permission=\<permission\>
+JS1.0;\<length\>;cmd=RSP-SCAN;file=\<relative-path\>;size=\<size\>;mtime=\<mtime\>;permission=\<permission\>
 .
 .
 .
-JS1.0;\<length\>;RSP-SCAN;status=complete;text=<text_if_required>
+JS1.0;\<length\>;cmd=RSP-SCAN;status=complete;text=<text_if_required>
 # HASH
 ## request
-JS1.0;\<length\>;REQ-HASH;directory=\<path\>;file=\<relative-path\>
+JS1.0;\<length\>;cmd=REQ-HASH;directory=\<path\>;file=\<relative-path\>
 ## response
-JS1.0;\<length\>;RSP-HASH;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
+JS1.0;\<length\>;cmd=RSP-HASH;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
 # Read file
 
 ## request
-JS1.0;\<length\>;REQ-READ;directory=\<path\>;file=\<relative-path\>
+JS1.0;\<length\>;cmd=REQ-READ;directory=\<path\>;file=\<relative-path\>
 ## response
-JS1.0;\<length\>;RSP-READ-CHUNK;directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
+JS1.0;\<length\>;cmd=RSP-READ-CHUNK;directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
 .
 .
 .
-JS1.0;\<length\>;RSP-READ;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
+JS1.0;\<length\>;cmd=RSP-READ;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
 
 # Write file
 ## request
-JS1.0;\<length\>;REQ-WRITE;directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>;hash=\<hash\>
+JS1.0;\<length\>;cmd=REQ-WRITE;directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>;hash=\<hash\>
 chunck bytes
-JS1.0;\<length\>REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;chunk=\<size\>
+JS1.0;\<length\>cmd=REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;chunk=\<size\>
 chunck bytes
 .
 .
 .
-JS1.0;\<length\>;REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;status=complete;
+JS1.0;\<length\>;cmd=REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;status=complete;
 ## response
-JS1.0;\<length\>;RSP-WRITE;directory=\<path\>;file=\<relative-path\>size=\<size\>;hash=\<hash\>;status=compete;text=<text_if_error>
+JS1.0;\<length\>;cmd=RSP-WRITE;directory=\<path\>;file=\<relative-path\>size=\<size\>;hash=\<hash\>;status=compete;text=<text_if_error>
 
 # Delete
 ## request
-JS1.0;\<length\>;REQ-DELETE;directory=\<path\>;file=\<relative-path\>
+JS1.0;\<length\>;cmd=REQ-DELETE;directory=\<path\>;file=\<relative-path\>
 ## response
-JS1.0;\<length\>;RSP-DELETE;directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
+JS1.0;\<length\>;cmd=RSP-DELETE;directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
 
 
 

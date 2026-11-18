@@ -12,6 +12,7 @@ add_library(jsync_core
     src/file_ops.cpp
     src/sha1.cpp
     src/peer.cpp
+    src/wire.cpp
 )
 target_include_directories(jsync_core PUBLIC src)
 target_link_libraries(jsync_core PUBLIC spdlog::spdlog)

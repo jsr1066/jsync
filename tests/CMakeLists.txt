@@ -22,3 +22,8 @@ add_executable(test_peer test_peer.cpp)
 target_link_libraries(test_peer PRIVATE jsync_core)
 target_compile_options(test_peer PRIVATE -Wall -Wextra)
 add_test(NAME peer COMMAND test_peer)
+
+add_executable(test_wire test_wire.cpp)
+target_link_libraries(test_wire PRIVATE jsync_core)
+target_compile_options(test_wire PRIVATE -Wall -Wextra)
+add_test(NAME wire COMMAND test_wire)

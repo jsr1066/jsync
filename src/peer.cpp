@@ -1,4 +1,5 @@
 #include "peer.h"
+#include "wire.h"
 
 #include <cerrno>
 #include <cstdlib>
@@ -354,7 +355,6 @@ namespace jsync_ns
     namespace
     {
         constexpr size_t HEADER_LEN = 15;
-        constexpr size_t MAX_COMMAND_LEN = 64 * 1024;
     }
 
     ExpectBool read_command(Peer& peer, std::string& command, std::map<std::string, std::string>& kv, std::vector<uint8_t>& chunk)
