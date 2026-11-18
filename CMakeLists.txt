@@ -17,5 +17,9 @@ target_include_directories(jsync_core PUBLIC src)
 target_link_libraries(jsync_core PUBLIC spdlog::spdlog)
 target_compile_options(jsync_core PRIVATE -Wall -Wextra)
 
+add_executable(jsync src/main.cpp)
+target_link_libraries(jsync PRIVATE jsync_core)
+target_compile_options(jsync PRIVATE -Wall -Wextra)
+
 enable_testing()
 add_subdirectory(tests)
