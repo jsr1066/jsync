@@ -30,10 +30,6 @@ namespace jsync_ns
         // carries the protocol, so the default logger is switched to stderr.
         ExpectBool accept();
 
-        // Spawns an arbitrary command and handshakes over its stdin/stdout.
-        // connect() is built on this; tests use it with local commands.
-        ExpectBool spawn(const std::vector<std::string>& argv);
-
         // Uses existing descriptors as the stream and handshakes. If owned, the
         // descriptors are closed by close().
         ExpectBool attach(int read_fd, int write_fd, bool owned);
@@ -48,6 +44,11 @@ namespace jsync_ns
 
         // Closes the stream (giving the remote EOF) and reaps any spawned child.
         void close();
+
+    public: // public for unit tests
+        // Spawns an arbitrary command and handshakes over its stdin/stdout.
+        // connect() is built on this; tests use it with local commands.
+        ExpectBool spawn(const std::vector<std::string>& argv);
 
     private:
         ExpectBool handshake();
