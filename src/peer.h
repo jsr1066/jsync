@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -62,4 +64,9 @@ namespace jsync_ns
         bool owned_ = false;
         pid_t child_ = -1;
     };
+
+    // Reads one wire message (see Commands.md): the 15 byte "JS1.0;<len>;" header,
+    // <len> bytes of key=value pairs, then chunk_size bytes of chunk data if the
+    // chunk_size key is present. command is set from the cmd key.
+    ExpectBool read_command(Peer&, std::string& command, std::map<std::string, std::string>& kv, std::vector<uint8_t>& chunk);
 }

@@ -350,4 +350,106 @@ namespace jsync_ns
             spdlog::info("child {}", how);
         }
     }
+
+    namespace
+    {
+        constexpr size_t HEADER_LEN = 15;
+        constexpr size_t MAX_COMMAND_LEN = 64 * 1024;
+    }
+
+    ExpectBool read_command(Peer& peer, std::string& command, std::map<std::string, std::string>& kv, std::vector<uint8_t>& chunk)
+    {
+        static constexpr char NAME[] = "read_command";
+        command.clear();
+        kv.clear();
+        chunk.clear();
+
+        char hdr[HEADER_LEN];
+        if (auto r = peer.receive(hdr, HEADER_LEN); !r)
+        {
+            return std::unexpected(r.error());
+        }
+        if (std::memcmp(hdr, "JS1.0", 5) != 0 || hdr[5] != ';' || hdr[14] != ';')
+        {
+            return fail(NAME, "bad header", EPROTO);
+        }
+
+        size_t len = 0;
+        for (int i = 6; i < 14; ++i)
+        {
+            if (hdr[i] < '0' || hdr[i] > '9')
+            {
+                return fail(NAME, "bad length in header", EPROTO);
+            }
+            len = len * 10 + static_cast<size_t>(hdr[i] - '0');
+        }
+        if (len > MAX_COMMAND_LEN)
+        {
+            return fail(NAME, "command too long", EMSGSIZE);
+        }
+
+        std::string data(len, '\0');
+        if (len > 0)
+        {
+            if (auto r = peer.receive(data.data(), len); !r)
+            {
+                return std::unexpected(r.error());
+            }
+        }
+
+        size_t pos = 0;
+        while (pos < data.size())
+        {
+            size_t end = data.find(';', pos);
+            if (end == std::string::npos)
+            {
+                end = data.size();
+            }
+            std::string token = data.substr(pos, end - pos);
+            pos = end + 1;
+            if (token.empty() || token == "\n")
+            {
+                continue;
+            }
+            size_t eq = token.find('=');
+            if (eq == std::string::npos || eq == 0)
+            {
+                return fail(NAME, "malformed key=value: " + token, EPROTO);
+            }
+            kv[token.substr(0, eq)] = token.substr(eq + 1);
+        }
+
+        auto cmd = kv.find("cmd");
+        if (cmd == kv.end())
+        {
+            return fail(NAME, "missing cmd", EPROTO);
+        }
+        command = cmd->second;
+
+        auto cs = kv.find("chunk_size");
+        if (cs != kv.end())
+        {
+            const std::string& v = cs->second;
+            char* endp = nullptr;
+            errno = 0;
+            unsigned long long n = std::strtoull(v.c_str(), &endp, 10);
+            if (v.empty() || v[0] == '-' || *endp != '\0' || errno != 0)
+            {
+                return fail(NAME, "bad chunk_size: " + v, EPROTO);
+            }
+            if (n > MAX_CHUNK)
+            {
+                return fail(NAME, "chunk_size too large: " + v, EMSGSIZE);
+            }
+            chunk.resize(n);
+            if (n > 0)
+            {
+                if (auto r = peer.receive(chunk.data(), n); !r)
+                {
+                    return std::unexpected(r.error());
+                }
+            }
+        }
+        return true;
+    }
 }

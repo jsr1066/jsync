@@ -1,5 +1,6 @@
 #include "peer.h"
 
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -14,6 +15,11 @@ static int failures = 0;
 
 #define CHECK(cond) \
     do { if (!(cond)) { std::cerr << __FILE__ << ":" << __LINE__ << " CHECK failed: " #cond "\n"; ++failures; } } while (0)
+
+static bool b_read_ok(Peer& p, std::string& c, std::map<std::string, std::string>& kv, std::vector<uint8_t>& ch)
+{
+    return read_command(p, c, kv, ch).has_value();
+}
 
 int main()
 {
@@ -102,6 +108,57 @@ int main()
         // Closing one end gives the other EOF.
         a.close();
         CHECK(!b.receive(buf, 1).has_value());
+    }
+
+    // read_command over a pipe pair.
+    {
+        int a_to_b[2], b_to_a[2];
+        CHECK(::pipe(a_to_b) == 0);
+        CHECK(::pipe(b_to_a) == 0);
+        Peer a, b;
+        std::thread ta([&] { a.attach(b_to_a[0], a_to_b[1], true); });
+        std::thread tb([&] { b.attach(a_to_b[0], b_to_a[1], true); });
+        ta.join();
+        tb.join();
+
+        auto frame = [](const std::string& body) {
+            char len[16];
+            std::snprintf(len, sizeof len, "%08zu", body.size());
+            return "JS1.0;" + std::string(len) + ";" + body;
+        };
+        std::string command;
+        std::map<std::string, std::string> kv;
+        std::vector<uint8_t> chunk;
+
+        std::string m1 = frame("cmd=REQ-HASH;directory=/x;file=a.txt");
+        CHECK(a.send(m1.data(), m1.size()).has_value());
+        CHECK(b_read_ok(b, command, kv, chunk));
+        CHECK(command == "REQ-HASH");
+        CHECK(kv["file"] == "a.txt" && kv["directory"] == "/x");
+        CHECK(chunk.empty());
+
+        std::string m2 = frame("cmd=REQ-WRITE;chunk_size=5") + "hello";
+        CHECK(a.send(m2.data(), m2.size()).has_value());
+        CHECK(b_read_ok(b, command, kv, chunk));
+        CHECK(command == "REQ-WRITE");
+        CHECK(std::string(chunk.begin(), chunk.end()) == "hello");
+
+        std::string bad_tag = "XX1.0;00000000;";
+        CHECK(a.send(bad_tag.data(), bad_tag.size()).has_value());
+        CHECK(!read_command(b, command, kv, chunk).has_value());
+
+        std::string bad_len = "JS1.0;0000abcd;";
+        CHECK(a.send(bad_len.data(), bad_len.size()).has_value());
+        CHECK(!read_command(b, command, kv, chunk).has_value());
+
+        std::string no_cmd = frame("file=a");
+        CHECK(a.send(no_cmd.data(), no_cmd.size()).has_value());
+        CHECK(!read_command(b, command, kv, chunk).has_value());
+
+        std::string trunc = frame("cmd=X;chunk_size=10") + "abc";
+        CHECK(a.send(trunc.data(), trunc.size()).has_value());
+        a.close();
+        CHECK(!read_command(b, command, kv, chunk).has_value());
     }
 
     if (failures == 0) std::cout << "all peer tests passed\n";
