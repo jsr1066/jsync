@@ -27,7 +27,8 @@ namespace jsync_ns
         ExpectBool connect(const std::string& host);
 
         // Server side: uses stdin/stdout as the stream and handshakes. stdout
-        // carries the protocol, so the default logger is switched to stderr.
+        // carries the protocol, so the default logger is switched to
+        // ~/.local/state/jsync/jsync.log (or stderr if that file can't be opened).
         ExpectBool accept();
 
         // Uses existing descriptors as the stream and handshakes. If owned, the

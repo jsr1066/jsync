@@ -1,6 +1,7 @@
 #include "peer.h"
 
 #include <cerrno>
+#include <cstdlib>
 #include <chrono>
 #include <csignal>
 #include <cstring>
@@ -12,6 +13,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -26,6 +28,17 @@ namespace jsync_ns
         constexpr char MAGIC[] = "JSYNC1\n";
         constexpr size_t MAGIC_LEN = sizeof(MAGIC) - 1;
         constexpr size_t MAX_NOISE = 64 * 1024;
+
+        // ~/.local/state/jsync/jsync.log; spdlog creates missing directories.
+        std::string server_log_path()
+        {
+            const char* home = std::getenv("HOME");
+            if (home == nullptr || *home == '\0')
+            {
+                return {};
+            }
+            return std::string(home) + "/.local/state/jsync/jsync.log";
+        }
 
         // Logs the error for the named command and wraps it for return.
         std::unexpected<Error> fail(const char* command, std::string message, int code)
@@ -91,8 +104,27 @@ namespace jsync_ns
 
     ExpectBool Peer::accept()
     {
-        // stdout is the protocol stream; log to stderr instead.
-        spdlog::set_default_logger(spdlog::stderr_color_mt("jsync"));
+        // stdout is the protocol stream, so log to a file instead, falling
+        // back to stderr if the file can't be opened (e.g. no write access).
+        const std::string log_path = server_log_path();
+        std::string log_error;
+        try
+        {
+            if (log_path.empty())
+            {
+                throw spdlog::spdlog_ex("HOME is not set");
+            }
+            spdlog::set_default_logger(spdlog::basic_logger_mt("jsync", log_path));
+        }
+        catch (const spdlog::spdlog_ex& ex)
+        {
+            log_error = ex.what();
+            spdlog::set_default_logger(spdlog::stderr_color_mt("jsync"));
+        }
+        if (!log_error.empty())
+        {
+            spdlog::warn("cannot log to {}, using stderr: {}", log_path, log_error);
+        }
         return attach(STDIN_FILENO, STDOUT_FILENO, false);
     }
 
