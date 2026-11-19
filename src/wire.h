@@ -12,15 +12,20 @@ namespace jsync_ns
     // will send or accept.
     constexpr size_t MAX_COMMAND_LEN = 64 * 1024;
 
-    // Converts to the wire format described in Commands.md:
-    // "JS1.0;<8 digit length>;cmd=...;key=value;...". out is replaced. An error
-    // is returned if a value can't be represented (e.g. contains ';').
+    // Terminates every field on the wire (DLE, 0x10). It is a control
+    // character, so it can't appear in a file name.
+    constexpr char FIELD_SEP = '\x10';
 
-    // Separates the regexes inside the excludes value of REQ-SCAN. ';' can't be
-    // used (it ends a field) and regexes may contain ',' or '|'.
+    // Converts to the wire format described in Commands.md:
+    // "JS1.0<FS><8 digit length><FS>cmd=...<FS>key=value<FS>...". out is
+    // replaced. An error is returned if a value can't be represented (e.g.
+    // contains FIELD_SEP).
+
+    // Separates the regexes inside the excludes value of REQ-SCAN. FIELD_SEP
+    // can't be used (it ends a field) and regexes may contain ',' or '|'.
     constexpr char EXCLUDE_SEP = '\x1f';
 
-    // Builds a REQ-SCAN: cmd=REQ-SCAN;directory=<d>;excludes=<r1><US><r2>...;
+    // Builds a REQ-SCAN: cmd=REQ-SCAN<FS>directory=<d><FS>excludes=<r1><US><r2>...;
     // The excludes key is omitted when the list is empty.
     ExpectBool convertToWire(const ScanRequest&, std::vector<uint8_t>& out);
 

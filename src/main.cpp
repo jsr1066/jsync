@@ -91,16 +91,16 @@ namespace
 
     constexpr char SCAN_DIR[] = "/home/jeff/Projects/jsync";
 
-    // Frames "cmd=RSP-SCAN;status=...;[text=...;]" (the terminating response).
+    // Frames "cmd=RSP-SCAN<FS>status=...<FS>[text=...<FS>]" (the terminating response).
     std::vector<uint8_t> scan_complete_wire(const std::string& status, const std::string& text)
     {
-        std::string body = "cmd=RSP-SCAN;status=" + status + ";";
+        std::string body = "cmd=RSP-SCAN" + std::string(1, FIELD_SEP) + "status=" + status + FIELD_SEP;
         if (!text.empty())
         {
-            body += "text=" + text + ";";
+            body += "text=" + text + FIELD_SEP;
         }
         char header[32];
-        int n = std::snprintf(header, sizeof header, "JS1.0;%08zu;", body.size());
+        int n = std::snprintf(header, sizeof header, "JS1.0%c%08zu%c", FIELD_SEP, body.size(), FIELD_SEP);
         std::vector<uint8_t> out(header, header + n);
         out.insert(out.end(), body.begin(), body.end());
         return out;
@@ -109,7 +109,7 @@ namespace
     int test_scan_client(Peer& peer)
     {
         std::vector<uint8_t> wire;
-        if (!convertToWire(ScanRequest{SCAN_DIR, {}}, wire) || !peer.send(wire.data(), wire.size()))
+        if (!convertToWire(ScanRequest{SCAN_DIR, {".git", ".obsi*"}}, wire) || !peer.send(wire.data(), wire.size()))
         {
             return 1;
         }

@@ -124,30 +124,30 @@ int main()
         auto frame = [](const std::string& body) {
             char len[16];
             std::snprintf(len, sizeof len, "%08zu", body.size());
-            return "JS1.0;" + std::string(len) + ";" + body;
+            return "JS1.0\020" + std::string(len) + "\020" + body;
         };
         std::string command;
         std::map<std::string, std::string> kv;
         std::vector<uint8_t> chunk;
 
-        std::string m1 = frame("cmd=REQ-HASH;directory=/x;file=a.txt");
+        std::string m1 = frame("cmd=REQ-HASH\020directory=/x\020file=a.txt");
         CHECK(a.send(m1.data(), m1.size()).has_value());
         CHECK(b_read_ok(b, command, kv, chunk));
         CHECK(command == "REQ-HASH");
         CHECK(kv["file"] == "a.txt" && kv["directory"] == "/x");
         CHECK(chunk.empty());
 
-        std::string m2 = frame("cmd=REQ-WRITE;chunk_size=5") + "hello";
+        std::string m2 = frame("cmd=REQ-WRITE\020chunk_size=5") + "hello";
         CHECK(a.send(m2.data(), m2.size()).has_value());
         CHECK(b_read_ok(b, command, kv, chunk));
         CHECK(command == "REQ-WRITE");
         CHECK(std::string(chunk.begin(), chunk.end()) == "hello");
 
-        std::string bad_tag = "XX1.0;00000000;";
+        std::string bad_tag = "XX1.0\02000000000\020";
         CHECK(a.send(bad_tag.data(), bad_tag.size()).has_value());
         CHECK(!read_command(b, command, kv, chunk).has_value());
 
-        std::string bad_len = "JS1.0;0000abcd;";
+        std::string bad_len = "JS1.0\0200000abcd\020";
         CHECK(a.send(bad_len.data(), bad_len.size()).has_value());
         CHECK(!read_command(b, command, kv, chunk).has_value());
 
@@ -155,7 +155,7 @@ int main()
         CHECK(a.send(no_cmd.data(), no_cmd.size()).has_value());
         CHECK(!read_command(b, command, kv, chunk).has_value());
 
-        std::string trunc = frame("cmd=X;chunk_size=10") + "abc";
+        std::string trunc = frame("cmd=X\020chunk_size=10") + "abc";
         CHECK(a.send(trunc.data(), trunc.size()).has_value());
         a.close();
         CHECK(!read_command(b, command, kv, chunk).has_value());

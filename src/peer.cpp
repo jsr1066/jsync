@@ -369,7 +369,7 @@ namespace jsync_ns
         {
             return std::unexpected(r.error());
         }
-        if (std::memcmp(hdr, "JS1.0", 5) != 0 || hdr[5] != ';' || hdr[14] != ';')
+        if (std::memcmp(hdr, "JS1.0", 5) != 0 || hdr[5] != FIELD_SEP || hdr[14] != FIELD_SEP)
         {
             return fail(NAME, "bad header", EPROTO);
         }
@@ -400,7 +400,7 @@ namespace jsync_ns
         size_t pos = 0;
         while (pos < data.size())
         {
-            size_t end = data.find(';', pos);
+            size_t end = data.find(FIELD_SEP, pos);
             if (end == std::string::npos)
             {
                 end = data.size();

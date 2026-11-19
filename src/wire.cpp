@@ -16,21 +16,21 @@ namespace jsync_ns
             return std::unexpected(Error{std::move(message), code});
         }
 
-        // Appends "key=value;". The value must not contain the delimiters.
+        // Appends "key=value<FS>". The value must not contain the delimiters.
         ExpectBool append_kv(std::string& body, const std::string& key, const std::string& value)
         {
-            if (key.empty() || key.find_first_of(";=\n") != std::string::npos)
+            if (key.empty() || key.find_first_of(std::string{FIELD_SEP} + "=\n") != std::string::npos)
             {
                 return fail("invalid key: " + key, EINVAL);
             }
-            if (value.find_first_of(";\n") != std::string::npos)
+            if (value.find_first_of(std::string{FIELD_SEP} + "\n") != std::string::npos)
             {
                 return fail("invalid character in value of " + key + ": " + value, EINVAL);
             }
             body += key;
             body += '=';
             body += value;
-            body += ';';
+            body += FIELD_SEP;
             return true;
         }
 
@@ -42,7 +42,7 @@ namespace jsync_ns
                 return fail("command too long: " + std::to_string(body.size()), EMSGSIZE);
             }
             char header[32];
-            int n = std::snprintf(header, sizeof header, "JS1.0;%08zu;", body.size());
+            int n = std::snprintf(header, sizeof header, "JS1.0%c%08zu%c", FIELD_SEP, body.size(), FIELD_SEP);
             out.assign(header, header + n);
             out.insert(out.end(), body.begin(), body.end());
             return true;

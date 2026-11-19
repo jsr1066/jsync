@@ -1,21 +1,25 @@
 # Write format
-This describes the wire protocol for each command. The protocol is an ASCII based semi-colon delimited key=value pairs on a single line. 
+This describes the wire protocol for each command. The protocol is an ASCII based key=value pairs on a single line. Fields are delimited by the byte 0x10 (written `<0x10>` below). Since 0x10 is a control character it cannot appear in a file name, so values never need escaping. 
 
-The commands that take a directory=\<...\> and file=\<relative-path\> are in the remote server file paths. It is the responsibilty of the client to convert into local paths.
+The commands that take a directory=\<...\> and file=\<relative-path\> are in the remote server file paths. It is the responsibilty of the client to map into local paths.
+## Client and server
+In this spec, the client is the host that posseses the SQLite database. It is responsible for remotly starting the server through the *jsync --server* command. All commands are sent from the client to the server. It is the client that makes all decisions about what files get transmitted and in what direction as well as determining which file should be deleted.
 
-## Fields
+# Fields
 The value are all transmitted in ASCII, no binary except for the file chunks.
+## Header
+The format of the header is as follows
+JS\<version\>\<0x10\>      This is the introduction. The version will be 1.0. The length of this field is always 5 bytes
+\<length\>\<0x10\>           The length in bytes of the remaining data. This length does not include any chunk data. The length of this field is always 8 bytes.
 
-The format of the wire is as follows
-JS\<version\>;      This is the introduction. The version will be 1.0. The length of this field is always 5 bytes
-\<length\>;           The length in bytes of the remaining data. This length does not include any chunk data. The length of this field is always 8 bytes
-\<command\>;     The request or response command
-key=value;...        The key value pairs, these can be considered arguments to the command
+The length of the header is always 15 bytes including delimiters.
 
-Since the JS and length are fixed size, a read of 15 bytes will always retrive the JS\<version\>;\<length\>;
-The JS tag can be used to check alignment and the length will indicate the next read length to get the command and kv pairs.
-
-## KV Fields
+Since the JS and length are fixed size, a read of 15 bytes will always retrive the JS\<version\>\<0x10\>\<length\>\<0x10\>
+The JS tag can be used to check alignment and the length will indicate the next read length to get all the kv pairs.
+## Body
+key=value\<0x10\>...        The key value pairs, these can be considered arguments to the command
+# KV Fields
+Listing of all defined keys
 
 | fieldname  | value                 | Note                                 |
 | ---------- | --------------------- | ------------------------------------ |
@@ -26,55 +30,129 @@ The JS tag can be used to check alignment and the length will indicate the next 
 | hash       | hex                   | File hash                            |
 | total_size | size_t                | Size of file                         |
 | chunk_size | size_t                | Size of file data following the line |
-| status     | "complete"<br>"error" | Completion status<br>                |
+| status     | "continue"<br>"complete"<br>"fail" | Completion status<br>                |
 | text       | string                | Error message                        |
 | mtime      | int                   | time_t value for modification time   |
 | permission | int                   | file permission                      |
 
 
 # SCAN
+The scan request is only ever sent from client to server
 ## request
-JS1.0;\<length\>;cmd=REQ-SCAN;directory=path;\[exclude=regex\<0x1f\>regex...\]
+| kv             | Notes               |
+| -------------- | ------------------- |
+| cmd=REQ-SCAN   | Mandatory           |
+| directory=path | Mandatory           |
+| exclude=regex  | Optional, repeating |
+## data
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=SCAN-DATA          | Mandatory |
+| file=\<relative-path\> | Mandatory |
+| size=\<size\>          | Mandatory |
+| mtime=\<mtime\>        | Mandatory |
+| status=continue        | Mandatory |
+
+SCAN-DATA repeats for each file. The REQ-SCAN is terminated by:
+
 ## response
-JS1.0;\<length\>;cmd=RSP-SCAN;file=\<relative-path\>;size=\<size\>;mtime=\<mtime\>;permission=\<permission\>
-.
-.
-.
-JS1.0;\<length\>;cmd=RSP-SCAN;status=complete;text=<text_if_required>
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=RSP-SCAN           | Mandatory |
+| status=complete\|fail        | Mandatory |
+| text=\<text\>          | Error text if status\=\=fail|
 # HASH
+The hash request is only sent from client to server
 ## request
-JS1.0;\<length\>;cmd=REQ-HASH;directory=\<path\>;file=\<relative-path\>
+
+| kv                    | Notes                   |
+| --------------------- | ----------------------- |
+| cmd=REQ-HASH          | Mandatory               |
+| directory=\<path\>    | Mandatory               |
+| file=\<relative-path\>| Mandatory               |   
+
 ## response
-JS1.0;\<length\>;cmd=RSP-HASH;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
+
+| kv                    | Notes                   |
+| --------------------- | ----------------------- |
+| cmd=RSP-HASH          | Mandatory               |
+| directory=\<path\>    | Mandatory               |
+| file=\<relative-path\>| Mandatory               |
+| hash=\<hash\>.        | Mandatory on success, optional on error               |   
+| status=complete\|fail | Mandatory               |
+| text="text"           | Optional, text if error |
 # Read file
+The read request is only sent from client to server. This is a file transfer from the server to the client
 
 ## request
-JS1.0;\<length\>;cmd=REQ-READ;directory=\<path\>;file=\<relative-path\>
-## response
-JS1.0;\<length\>;cmd=RSP-READ-CHUNK;directory=\<path\>;file=\<relative-path\>;total-size=\<size\>;chunck=\<size\>
-.
-.
-.
-JS1.0;\<length\>;cmd=RSP-READ;directory=\<path\>;file=\<relative-path\>;hash=\<hash\>;status=complete;text=<text_if_error>
+| kv                    | Notes                   |
+| --------------------- | ----------------------- |
+| cmd=REQ-READ          | Mandatory               |
+| directory=\<path\>    | Mandatory               |
+| file=\<relative-path\>| Mandatory               | 
+
+## data
+The server will sent these messages repeatedly until all data has been sent
+
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=DATA-CHUNK           | Mandatory |
+| directory=\<path\>     | Mandatory |
+| file=\<relative-path\> | Mandatory |
+| total_size=\<size\>    | Mandatory |
+| chunk_size=\<size\>    | Mandatory |
+| status=continue        | Mandatory |
+Chunk data immediatly follows this message
+
+## Response
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=RSP-READ           | Mandatory |
+| directory=\<path\>     | Mandatory |
+| file=\<relative-path\> | Mandatory |
+| hash=\<hash\>          | Mandatory if status\=\=complete |
+| status=\<complete\|fail\>    | Mandatory |
+| test=\<text\>        | Optional, error text |
 
 # Write file
+The write file request is only sent from the client to the server.
+This is a file transfer from the client to the server.
 ## request
-JS1.0;\<length\>;cmd=REQ-WRITE;directory=\<path\>;file=\<relative-path\>;total=\<size\>;chunk=\<size\>;hash=\<hash\>
-chunck bytes
-JS1.0;\<length\>cmd=REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;chunk=\<size\>
-chunck bytes
-.
-.
-.
-JS1.0;\<length\>;cmd=REQ-WRITE-CHUNK;directory=\<path\>;file=\<relative-path\>;status=complete;
+|kv|Notes|
+|---|---|
+|cmd=REQ-WRITE|Mandatory|
+|directory=\<path\>|Mandatory|
+|file=\<relative-path\>|Mandatory|
+|hash=\<hash\> | Mandatory|
+
+## data
+See READ for the data chunk
+
 ## response
-JS1.0;\<length\>;cmd=RSP-WRITE;directory=\<path\>;file=\<relative-path\>size=\<size\>;hash=\<hash\>;status=compete;text=<text_if_error>
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=RSP-WRITE           | Mandatory |
+| directory=\<path\>     | Mandatory |
+| file=\<relative-path\> | Mandatory |
+| status=comnplete\|fail        | Mandatory |
+| text=\<text\>          |Optional, present on error
 
 # Delete
+The delete request is only sent from the client to the server
 ## request
-JS1.0;\<length\>;cmd=REQ-DELETE;directory=\<path\>;file=\<relative-path\>
-## response
-JS1.0;\<length\>;cmd=RSP-DELETE;directory=\<path\>;file=\<relative-path\>;status=complete;text=<text_if_error>
+|kv|Notes|
+|---|---|
+|cmd=REQ-DELETE|Mandatory|
+|directory=<path>|Mandatory|
+|file=<relative-path>|Mandatory|
 
+## response
+| kv                     | Notes     |
+| ---------------------- | --------- |
+| cmd=RSP-DELETE           | Mandatory |
+| directory=\<path\>     |          |
+| file=\<relative-path\> | Mandatory |
+| status=complete\|fail        | Mandatory |
+| text=\<text\>          |Optional, present on error
 
 

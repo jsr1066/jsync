@@ -27,10 +27,10 @@ int main()
     std::vector<uint8_t> out;
     CHECK(convertToWire(info, out).has_value());
     std::string s(out.begin(), out.end());
-    std::string body = "cmd=RSP-SCAN;file=sub/a.txt;size=1234;mtime=1700000000;permission=420;";
+    std::string body = "cmd=RSP-SCAN\020file=sub/a.txt\020size=1234\020mtime=1700000000\020permission=420\020";
     char len[16];
     std::snprintf(len, sizeof len, "%08zu", body.size());
-    CHECK(s == "JS1.0;" + std::string(len) + ";" + body);
+    CHECK(s == "JS1.0\020" + std::string(len) + "\020" + body);
     CHECK(s.size() == 15 + body.size());
 
     // Round trip through read_command.
@@ -64,28 +64,28 @@ int main()
         req.directory = "/srv/data";
         req.excludes = {"\\.git/.*", "a{1,3}\\.o$"};
         CHECK(convertToWire(req, out).has_value());
-        std::string rb = std::string("cmd=REQ-SCAN;directory=/srv/data;excludes=") + "\\.git/.*" + EXCLUDE_SEP + "a{1,3}\\.o$;";
+        std::string rb = std::string("cmd=REQ-SCAN\020directory=/srv/data\020excludes=") + "\\.git/.*" + EXCLUDE_SEP + "a{1,3}\\.o$\020";
         std::snprintf(len, sizeof len, "%08zu", rb.size());
-        CHECK(std::string(out.begin(), out.end()) == "JS1.0;" + std::string(len) + ";" + rb);
+        CHECK(std::string(out.begin(), out.end()) == "JS1.0\020" + std::string(len) + "\020" + rb);
 
         req.excludes.clear();
         CHECK(convertToWire(req, out).has_value());
         CHECK(std::string(out.begin(), out.end()).find("excludes") == std::string::npos);
 
-        req.excludes = {"a;b"};
+        req.excludes = {std::string("a") + FIELD_SEP + "b"};
         CHECK(!convertToWire(req, out).has_value());
         req.excludes = {"a\nb"};
         CHECK(!convertToWire(req, out).has_value());
         req.excludes = {std::string("a") + EXCLUDE_SEP + "b"};
         CHECK(!convertToWire(req, out).has_value());
         req.excludes.clear();
-        req.directory = "x;y";
+        req.directory = std::string("x") + FIELD_SEP + "y";
         CHECK(!convertToWire(req, out).has_value());
     }
 
     // Delimiters in values are rejected.
     ScanInfo bad = info;
-    bad.rpath = "a;b";
+    bad.rpath = std::string("a") + FIELD_SEP + "b";
     CHECK(!convertToWire(bad, out).has_value());
     bad.rpath = "a\nb";
     CHECK(!convertToWire(bad, out).has_value());
