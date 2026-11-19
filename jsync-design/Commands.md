@@ -47,13 +47,14 @@ The scan request is only ever sent from client to server
 ## data
 | kv                     | Notes     |
 | ---------------------- | --------- |
-| cmd=SCAN-DATA          | Mandatory |
+| cmd=DATA-SCAN          | Mandatory |
 | file=\<relative-path\> | Mandatory |
 | size=\<size\>          | Mandatory |
 | mtime=\<mtime\>        | Mandatory |
+| permission=\<perm\>    | Mandatory |
 | status=continue        | Mandatory |
 
-SCAN-DATA repeats for each file. The REQ-SCAN is terminated by:
+DATA-SCAN repeats for each file. The REQ-SCAN is terminated by the RSP-SCAN below. Note: on the wire the exclude regexes are sent as a single `excludes` key, joined by 0x1f.
 
 ## response
 | kv                     | Notes     |

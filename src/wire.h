@@ -29,6 +29,9 @@ namespace jsync_ns
     // The excludes key is omitted when the list is empty.
     ExpectBool convertToWire(const ScanRequest&, std::vector<uint8_t>& out);
 
-    // Builds an RSP-SCAN entry.
+    // Builds a DATA-SCAN entry (one per file, status=continue).
     ExpectBool convertToWire(const ScanInfo&, std::vector<uint8_t>& out);
+
+    // Builds the final RSP-SCAN (status=complete|fail, text if non-empty).
+    ExpectBool convertToWire(const ScanResponse&, std::vector<uint8_t>& out);
 }

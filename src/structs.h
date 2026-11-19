@@ -35,6 +35,13 @@ namespace jsync_ns
         std::vector<std::string> excludes;
     };
 
+    // RSP-SCAN: the final message of a scan.
+    struct ScanResponse
+    {
+        bool ok = true;
+        std::string text;
+    };
+
     // State for reading or writing  a file chunk by chunk. Owns the file descriptor and
     // closes it on destruction, so it is move-only.
     struct IOContext

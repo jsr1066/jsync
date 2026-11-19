@@ -91,19 +91,18 @@ namespace
 
     constexpr char SCAN_DIR[] = "/home/jeff/Projects/jsync";
 
-    // Frames "cmd=RSP-SCAN<FS>status=...<FS>[text=...<FS>]" (the terminating response).
-    std::vector<uint8_t> scan_complete_wire(const std::string& status, const std::string& text)
+    // Sends the terminating RSP-SCAN. Newlines in text are flattened so it always fits the wire.
+    bool send_scan_response(Peer& peer, bool ok, std::string text)
     {
-        std::string body = "cmd=RSP-SCAN" + std::string(1, FIELD_SEP) + "status=" + status + FIELD_SEP;
-        if (!text.empty())
+        for (char& c : text)
         {
-            body += "text=" + text + FIELD_SEP;
+            if (c == '\n' || c == FIELD_SEP)
+            {
+                c = ' ';
+            }
         }
-        char header[32];
-        int n = std::snprintf(header, sizeof header, "JS1.0%c%08zu%c", FIELD_SEP, body.size(), FIELD_SEP);
-        std::vector<uint8_t> out(header, header + n);
-        out.insert(out.end(), body.begin(), body.end());
-        return out;
+        std::vector<uint8_t> wire;
+        return convertToWire(ScanResponse{ok, std::move(text)}, wire) && peer.send(wire.data(), wire.size());
     }
 
     int test_scan_client(Peer& peer)
@@ -124,26 +123,26 @@ namespace
             {
                 return 1;
             }
+            if (command == "DATA-SCAN")
+            {
+                ++count;
+                std::printf("%s size=%s mtime=%s permission=%s\n", kv["file"].c_str(), kv["size"].c_str(),
+                            kv["mtime"].c_str(), kv["permission"].c_str());
+                continue;
+            }
             if (command != "RSP-SCAN")
             {
                 std::fprintf(stderr, "unexpected response: %s\n", command.c_str());
                 return 1;
             }
-            auto status = kv.find("status");
-            if (status != kv.end())
+            const std::string& text = kv["text"];
+            if (kv["status"] != "complete")
             {
-                const std::string& text = kv["text"];
-                if (status->second != "complete")
-                {
-                    std::fprintf(stderr, "scan failed: %s\n", text.c_str());
-                    return 1;
-                }
-                std::printf("scan complete: %zu files%s%s\n", count, text.empty() ? "" : " - ", text.c_str());
-                return 0;
+                std::fprintf(stderr, "scan failed: %s\n", text.c_str());
+                return 1;
             }
-            ++count;
-            std::printf("%s size=%s mtime=%s permission=%s\n", kv["file"].c_str(), kv["size"].c_str(),
-                        kv["mtime"].c_str(), kv["permission"].c_str());
+            std::printf("scan complete: %zu files%s%s\n", count, text.empty() ? "" : " - ", text.c_str());
+            return 0;
         }
     }
 
@@ -158,8 +157,7 @@ namespace
         }
         if (command != "REQ-SCAN" || !kv.contains("directory"))
         {
-            auto wire = scan_complete_wire("error", "expected REQ-SCAN with directory");
-            peer.send(wire.data(), wire.size());
+            send_scan_response(peer, false, "expected REQ-SCAN with directory");
             return 1;
         }
 
@@ -187,8 +185,7 @@ namespace
         std::vector<ScanInfo> results;
         if (auto r = ops.scan(kv["directory"], excludes, results); !r)
         {
-            auto wire = scan_complete_wire("error", r.error().err);
-            peer.send(wire.data(), wire.size());
+            send_scan_response(peer, false, r.error().err);
             return 1;
         }
 
@@ -200,8 +197,7 @@ namespace
                 return 1;
             }
         }
-        auto wire = scan_complete_wire("complete", "");
-        if (!peer.send(wire.data(), wire.size()))
+        if (!send_scan_response(peer, true, ""))
         {
             return 1;
         }

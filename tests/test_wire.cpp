@@ -27,7 +27,7 @@ int main()
     std::vector<uint8_t> out;
     CHECK(convertToWire(info, out).has_value());
     std::string s(out.begin(), out.end());
-    std::string body = "cmd=RSP-SCAN\020file=sub/a.txt\020size=1234\020mtime=1700000000\020permission=420\020";
+    std::string body = "cmd=DATA-SCAN\020file=sub/a.txt\020size=1234\020mtime=1700000000\020permission=420\020status=continue\020";
     char len[16];
     std::snprintf(len, sizeof len, "%08zu", body.size());
     CHECK(s == "JS1.0\020" + std::string(len) + "\020" + body);
@@ -49,13 +49,28 @@ int main()
         std::map<std::string, std::string> kv;
         std::vector<uint8_t> chunk;
         CHECK(read_command(b, command, kv, chunk).has_value());
-        CHECK(command == "RSP-SCAN");
+        CHECK(command == "DATA-SCAN");
         CHECK(kv.count("directory") == 0);
         CHECK(kv["file"] == "sub/a.txt");
         CHECK(kv["size"] == "1234");
         CHECK(kv["mtime"] == "1700000000");
         CHECK(kv["permission"] == "420");
+        CHECK(kv["status"] == "continue");
         CHECK(chunk.empty());
+    }
+
+    // Final RSP-SCAN.
+    {
+        std::vector<uint8_t> rsp;
+        CHECK(convertToWire(ScanResponse{true, ""}, rsp).has_value());
+        std::string rb = "cmd=RSP-SCAN\020status=complete\020";
+        std::snprintf(len, sizeof len, "%08zu", rb.size());
+        CHECK(std::string(rsp.begin(), rsp.end()) == "JS1.0\020" + std::string(len) + "\020" + rb);
+
+        CHECK(convertToWire(ScanResponse{false, "boom"}, rsp).has_value());
+        rb = "cmd=RSP-SCAN\020status=fail\020text=boom\020";
+        std::snprintf(len, sizeof len, "%08zu", rb.size());
+        CHECK(std::string(rsp.begin(), rsp.end()) == "JS1.0\020" + std::string(len) + "\020" + rb);
     }
 
     // REQ-SCAN.

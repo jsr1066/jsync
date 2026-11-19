@@ -89,14 +89,36 @@ namespace jsync_ns
     {
         std::string body;
         for (auto r : {
-                 append_kv(body, "cmd", "RSP-SCAN"),
+                 append_kv(body, "cmd", "DATA-SCAN"),
                  append_kv(body, "file", info.rpath),
                  append_kv(body, "size", std::to_string(info.size)),
                  append_kv(body, "mtime", std::to_string(static_cast<long long>(info.mtime))),
                  append_kv(body, "permission", std::to_string(info.permission)),
+                 append_kv(body, "status", "continue"),
              })
         {
             if (!r)
+            {
+                return r;
+            }
+        }
+        return frame(body, out);
+    }
+
+    ExpectBool convertToWire(const ScanResponse& rsp, std::vector<uint8_t>& out)
+    {
+        std::string body;
+        if (auto r = append_kv(body, "cmd", "RSP-SCAN"); !r)
+        {
+            return r;
+        }
+        if (auto r = append_kv(body, "status", rsp.ok ? "complete" : "fail"); !r)
+        {
+            return r;
+        }
+        if (!rsp.text.empty())
+        {
+            if (auto r = append_kv(body, "text", rsp.text); !r)
             {
                 return r;
             }
