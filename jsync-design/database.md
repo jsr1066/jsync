@@ -14,11 +14,19 @@ The files and directories to be synchronized, added by `jsync add`.
 client_path is the local path and server_path the remote path. directory is a boolean:
 if true the paths are directories to be scanned (locally and remotely), otherwise
 they are a single file to be synchronized.
+
+excludes holds the regexes of files to skip in a directory, joined by the 0x1f
+separator (the same format as the excludes value of REQ-SCAN). The same regexes are
+used for the local and the remote scan and are matched against the rpath. It is NULL
+when there are none, and always NULL for a single file.
+When the excludes of a directory change, the files rows that match are deleted so that
+they are not mistaken for deleted files.
 ```
 CREATE TABLE sync (
     client_path TEXT PRIMARY KEY,
     server_path TEXT NOT NULL,
-    directory INTEGER NOT NULL
+    directory INTEGER NOT NULL,
+    excludes TEXT
 );
 ```
 

@@ -43,6 +43,7 @@ namespace jsync_ns
         std::string client_path;
         std::string server_path;
         bool directory;
+        std::vector<std::string> excludes; // regexes of files to skip (directories only)
     };
 
     // A row of the files table: the metadata of a file in a synchronized

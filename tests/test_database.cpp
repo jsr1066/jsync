@@ -125,7 +125,78 @@ int main()
         CHECK((*other)[0].hash.empty());
     auto unknown = db.files_in("/nope");
     CHECK(unknown.has_value() && unknown->empty());
+    // Excludes.
+    fs::create_directories(root / "dir2");
+    std::string dir2 = (root / "dir2").string();
+    CHECK(db.add(dir2, "/srv/dir2", {"\\.log$", "^build$"}));
+
+    auto bad = db.add((root / "dir").string() + "/", "/srv/x", {"("});
+    CHECK(!bad);
+    if (!bad)
+        CHECK(bad.error().kind == ErrorKind::Regex);
+    CHECK(!db.add(file, "/srv/x", {"a"}));
+    CHECK(!db.add(dir2, "/srv/x", {"a\x1f" "b"}));
+
+    auto sync = db.sync_items();
+    CHECK(sync.has_value());
+    if (sync)
+    {
+        for (const auto& item : *sync)
+        {
+            if (item.client_path == dir2)
+            {
+                CHECK(item.excludes.size() == 2);
+                if (item.excludes.size() == 2)
+                {
+                    CHECK(item.excludes[0] == "\\.log$");
+                    CHECK(item.excludes[1] == "^build$");
+                }
+            }
+            else
+                CHECK(item.excludes.empty());
+        }
+    }
+
+    // set_excludes deletes the files rows the new excludes match, including
+    // files under an excluded directory, and keeps the rest.
+    CHECK(db.put_files(dir2, {{"a.log", "h", 1, 1, 1}, {"keep.txt", "h", 1, 1, 1},
+                              {"build/out.o", "h", 1, 1, 1}, {"build2/x.txt", "h", 1, 1, 1}}));
+    CHECK(db.set_excludes(dir2, {"\\.log$", "^build$"}));
+    auto kept = db.files_in(dir2);
+    CHECK(kept.has_value() && kept->size() == 2);
+    if (kept && kept->size() == 2)
+    {
+        CHECK((*kept)[0].rpath == "build2/x.txt");
+        CHECK((*kept)[1].rpath == "keep.txt");
+    }
+
+    // An invalid regex changes nothing.
+    CHECK(!db.set_excludes(dir2, {"("}));
+    sync = db.sync_items();
+    if (sync)
+        for (const auto& item : *sync)
+            if (item.client_path == dir2)
+                CHECK(item.excludes.size() == 2);
+
+    // Clearing the excludes stores none; files rows are untouched.
+    CHECK(db.set_excludes(dir2, {}));
+    sync = db.sync_items();
+    if (sync)
+        for (const auto& item : *sync)
+            if (item.client_path == dir2)
+                CHECK(item.excludes.empty());
+    kept = db.files_in(dir2);
+    CHECK(kept.has_value() && kept->size() == 2);
+
+    // Only a directory in the sync table can have excludes.
+    CHECK(!db.set_excludes(file, {"a"}));
+    auto notfound = db.set_excludes("/nope", {"a"});
+    CHECK(!notfound);
+    if (!notfound)
+        CHECK(notfound.error().ecode == ENOENT);
+
     db.close();
+    CHECK(!db.set_excludes(dir2, {}));
     CHECK(!db.put_files("/a", {{"x", "h", 1, 1, 1}}));
 
     fs::remove_all(root);

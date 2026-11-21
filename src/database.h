@@ -31,9 +31,19 @@ namespace jsync_ns
 
         // Adds a file or directory to be synchronized to the sync table.
         // client_path must exist locally; sync.directory is set from whether
-        // it is a directory or a regular file. Fails if it is neither, does not
-        // exist, or is already in the table.
-        ExpectBool add(const std::string& client_path, const std::string& server_path);
+        // it is a directory or a regular file. excludes are regexes of files
+        // to skip, only allowed for a directory; each must compile and not
+        // contain the wire separators. Fails if client_path is neither, does
+        // not exist, or is already in the table.
+        ExpectBool add(const std::string& client_path, const std::string& server_path,
+                       const std::vector<std::string>& excludes = {});
+
+        // Replaces the excludes of the directory client_path in the sync table
+        // (validated as in add()) and deletes the files rows that the new
+        // excludes match, in one transaction, so that excluded files are not
+        // mistaken for deleted ones. Fails if client_path is not a directory
+        // in the sync table.
+        ExpectBool set_excludes(const std::string& client_path, const std::vector<std::string>& excludes);
 
         // Returns every row of the sync table, ordered by client_path.
         ExpectSyncItems sync_items();

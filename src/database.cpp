@@ -1,11 +1,15 @@
 #include "database.h"
 
+#include <algorithm>
 #include <filesystem>
+#include <regex>
 #include <system_error>
 
 #include <cerrno>
 
 #include <sqlite3.h>
+
+#include "wire.h"
 
 namespace jsync_ns
 {
@@ -23,11 +27,13 @@ namespace jsync_ns
 
             -- Files and directories to be synchronized. directory is a
             -- boolean: the paths are directories to be scanned rather than a
-            -- single file.
+            -- single file. excludes holds regexes of files to skip, joined by
+            -- the 0x1f separator; NULL if none.
             CREATE TABLE sync (
                 client_path TEXT PRIMARY KEY,
                 server_path TEXT NOT NULL,
-                directory INTEGER NOT NULL
+                directory INTEGER NOT NULL,
+                excludes TEXT
             );
 
             -- Metadata of each file in a synchronized directory as of the last
@@ -56,6 +62,67 @@ namespace jsync_ns
                 created_at INTEGER
             );
         )sql";
+
+        // Compiles excludes into patterns, rejecting any that is not a valid
+        // regex or contains a character the wire format reserves.
+        ExpectBool compile_excludes(const std::vector<std::string>& excludes, std::vector<std::regex>& patterns)
+        {
+            patterns.clear();
+            for (const auto& exclude : excludes)
+            {
+                if (exclude.find_first_of(std::string{EXCLUDE_SEP, FIELD_SEP, '\n'}) != std::string::npos)
+                    return std::unexpected(Error{"exclude contains a reserved character: " + exclude, EINVAL, ErrorKind::Errno});
+                try
+                {
+                    patterns.emplace_back(exclude);
+                }
+                catch (const std::regex_error& e)
+                {
+                    return std::unexpected(Error{"invalid exclude regex '" + exclude + "': " + e.what(), static_cast<int>(e.code()), ErrorKind::Regex});
+                }
+            }
+            return true;
+        }
+
+        std::string join_excludes(const std::vector<std::string>& excludes)
+        {
+            std::string joined;
+            for (size_t i = 0; i < excludes.size(); ++i)
+            {
+                if (i > 0)
+                    joined += EXCLUDE_SEP;
+                joined += excludes[i];
+            }
+            return joined;
+        }
+
+        std::vector<std::string> split_excludes(const std::string& joined)
+        {
+            std::vector<std::string> excludes;
+            if (joined.empty())
+                return excludes;
+            size_t start = 0;
+            for (size_t pos; (pos = joined.find(EXCLUDE_SEP, start)) != std::string::npos; start = pos + 1)
+                excludes.push_back(joined.substr(start, pos - start));
+            excludes.push_back(joined.substr(start));
+            return excludes;
+        }
+
+        // Matches the scan: a file is skipped if a pattern matches its rpath
+        // or the rpath of any directory above it, since a skipped directory
+        // is not entered.
+        bool is_excluded(const std::string& rpath, const std::vector<std::regex>& patterns)
+        {
+            auto matches = [&](const std::string& path)
+            {
+                return std::any_of(patterns.begin(), patterns.end(),
+                    [&path](const std::regex& re) { return std::regex_search(path, re); });
+            };
+            for (size_t slash = rpath.find('/'); slash != std::string::npos; slash = rpath.find('/', slash + 1))
+                if (matches(rpath.substr(0, slash)))
+                    return true;
+            return matches(rpath);
+        }
     }
 
     Database::Database() = default;
@@ -95,7 +162,8 @@ namespace jsync_ns
         return true;
     }
 
-    ExpectBool Database::add(const std::string& client_path, const std::string& server_path)
+    ExpectBool Database::add(const std::string& client_path, const std::string& server_path,
+                             const std::vector<std::string>& excludes)
     {
         if (db_ == nullptr)
             return std::unexpected(Error{"Cannot add " + client_path + ": database is not open", EINVAL, ErrorKind::Errno});
@@ -114,15 +182,24 @@ namespace jsync_ns
         else
             return std::unexpected(Error{"Cannot add " + client_path + ": not a regular file or directory", EINVAL, ErrorKind::Errno});
 
+        if (directory == 0 && !excludes.empty())
+            return std::unexpected(Error{"Cannot add " + client_path + ": excludes are only allowed for a directory", EINVAL, ErrorKind::Errno});
+        std::vector<std::regex> patterns;
+        if (auto r = compile_excludes(excludes, patterns); !r)
+            return std::unexpected(Error{"Cannot add " + client_path + ": " + r.error().err, r.error().ecode, r.error().kind});
+
         // A duplicate client_path violates the primary key and is an error.
         sqlite3_stmt* stmt = nullptr;
-        int rc = sqlite3_prepare_v2(db_, "INSERT INTO sync (client_path, server_path, directory) VALUES (?1, ?2, ?3)", -1, &stmt, nullptr);
+        int rc = sqlite3_prepare_v2(db_, "INSERT INTO sync (client_path, server_path, directory, excludes) VALUES (?1, ?2, ?3, ?4)", -1, &stmt, nullptr);
         if (rc == SQLITE_OK)
             rc = bind_text(stmt, 1, client_path);
         if (rc == SQLITE_OK)
             rc = bind_text(stmt, 2, server_path);
         if (rc == SQLITE_OK)
             rc = sqlite3_bind_int(stmt, 3, directory);
+        const std::string joined = join_excludes(excludes);
+        if (rc == SQLITE_OK)
+            rc = joined.empty() ? sqlite3_bind_null(stmt, 4) : bind_text(stmt, 4, joined);
         if (rc == SQLITE_OK)
         {
             rc = sqlite3_step(stmt);
@@ -137,6 +214,89 @@ namespace jsync_ns
         }
         sqlite3_finalize(stmt);
         return true;
+    }
+
+    ExpectBool Database::set_excludes(const std::string& client_path, const std::vector<std::string>& excludes)
+    {
+        const std::string what = "Cannot set excludes of " + client_path + ": ";
+        if (db_ == nullptr)
+            return std::unexpected(Error{what + "database is not open", EINVAL, ErrorKind::Errno});
+
+        std::vector<std::regex> patterns;
+        if (auto r = compile_excludes(excludes, patterns); !r)
+            return std::unexpected(Error{what + r.error().err, r.error().ecode, r.error().kind});
+
+        if (auto r = exec("BEGIN"); !r)
+            return r;
+
+        // Runs the update and the purge; any failure leaves rc and msg set.
+        int rc = SQLITE_OK;
+        std::string msg;
+        bool not_found = false;
+
+        sqlite3_stmt* stmt = nullptr;
+        rc = sqlite3_prepare_v2(db_, "UPDATE sync SET excludes = ?2 WHERE client_path = ?1 AND directory = 1", -1, &stmt, nullptr);
+        const std::string joined = join_excludes(excludes);
+        if (rc == SQLITE_OK)
+            rc = bind_text(stmt, 1, client_path);
+        if (rc == SQLITE_OK)
+            rc = joined.empty() ? sqlite3_bind_null(stmt, 2) : bind_text(stmt, 2, joined);
+        if (rc == SQLITE_OK)
+        {
+            rc = sqlite3_step(stmt);
+            if (rc == SQLITE_DONE)
+                rc = SQLITE_OK;
+        }
+        if (rc != SQLITE_OK)
+            msg = sqlite3_errmsg(db_);
+        else if (sqlite3_changes(db_) == 0)
+            not_found = true;
+        sqlite3_finalize(stmt);
+
+        if (rc == SQLITE_OK && !not_found)
+        {
+            auto records = files_in(client_path);
+            if (!records)
+            {
+                exec("ROLLBACK");
+                return std::unexpected(Error{what + records.error().err, records.error().ecode, records.error().kind});
+            }
+
+            stmt = nullptr;
+            rc = sqlite3_prepare_v2(db_, "DELETE FROM files WHERE client_path = ?1 AND rpath = ?2", -1, &stmt, nullptr);
+            for (size_t i = 0; rc == SQLITE_OK && i < records->size(); ++i)
+            {
+                const std::string& rpath = (*records)[i].rpath;
+                if (!is_excluded(rpath, patterns))
+                    continue;
+                rc = bind_text(stmt, 1, client_path);
+                if (rc == SQLITE_OK)
+                    rc = bind_text(stmt, 2, rpath);
+                if (rc == SQLITE_OK)
+                {
+                    rc = sqlite3_step(stmt);
+                    if (rc == SQLITE_DONE)
+                        rc = SQLITE_OK;
+                }
+                if (rc == SQLITE_OK)
+                    rc = sqlite3_reset(stmt);
+            }
+            if (rc != SQLITE_OK)
+                msg = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
+        }
+
+        if (not_found)
+        {
+            exec("ROLLBACK");
+            return std::unexpected(Error{what + "not a directory in the sync table", ENOENT, ErrorKind::Errno});
+        }
+        if (rc != SQLITE_OK)
+        {
+            exec("ROLLBACK");
+            return std::unexpected(Error{what + msg, rc, ErrorKind::Sqlite});
+        }
+        return exec("COMMIT");
     }
 
     int Database::bind_text(sqlite3_stmt* stmt, int idx, const std::string& value)
@@ -159,11 +319,11 @@ namespace jsync_ns
             return std::unexpected(Error{"Cannot read sync table: database is not open", EINVAL, ErrorKind::Errno});
 
         sqlite3_stmt* stmt = nullptr;
-        int rc = sqlite3_prepare_v2(db_, "SELECT client_path, server_path, directory FROM sync ORDER BY client_path", -1, &stmt, nullptr);
+        int rc = sqlite3_prepare_v2(db_, "SELECT client_path, server_path, directory, excludes FROM sync ORDER BY client_path", -1, &stmt, nullptr);
         std::vector<SyncItem> items;
         while (rc == SQLITE_OK && (rc = sqlite3_step(stmt)) == SQLITE_ROW)
         {
-            items.push_back({column_string(stmt, 0), column_string(stmt, 1), sqlite3_column_int(stmt, 2) != 0});
+            items.push_back({column_string(stmt, 0), column_string(stmt, 1), sqlite3_column_int(stmt, 2) != 0, split_excludes(column_string(stmt, 3))});
             rc = SQLITE_OK;
         }
         if (rc != SQLITE_DONE)
