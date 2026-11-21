@@ -5,6 +5,7 @@
 #include "structs.h"
 
 struct sqlite3;
+struct sqlite3_stmt;
 
 namespace jsync_ns
 {
@@ -27,6 +28,19 @@ namespace jsync_ns
         // if initialization fails the new file is removed.
         ExpectBool create(const std::string& path, const std::string& ssh_connect);
 
+        // Adds a file or directory to be synchronized to the sync table.
+        // client_path must exist locally; sync.directory is set from whether
+        // it is a directory or a regular file. Fails if it is neither, does not
+        // exist, or is already in the table.
+        ExpectBool add(const std::string& client_path, const std::string& server_path);
+
+        // Returns every row of the sync table, ordered by client_path.
+        ExpectSyncItems sync_items();
+
+        // Returns the stored metadata of every file in the directory
+        // client_path (a sync item with directory true), ordered by rpath.
+        ExpectFileRecords files_in(const std::string& client_path);
+
         bool is_open() const;
 
         // Closes the connection; does nothing if not open.
@@ -45,6 +59,9 @@ namespace jsync_ns
 
         // Inserts or replaces a row in settings.
         ExpectBool set_setting(const std::string& key, const std::string& value);
+
+        // Binds text to parameter idx of stmt.
+        static int bind_text(sqlite3_stmt* stmt, int idx, const std::string& value);
 
         sqlite3* db_ = nullptr;
         std::string path_;

@@ -37,6 +37,25 @@ namespace jsync_ns
         time_t mtime;
     };
 
+    // A row of the sync table: a file or directory to be synchronized.
+    struct SyncItem
+    {
+        std::string client_path;
+        std::string server_path;
+        bool directory;
+    };
+
+    // A row of the files table: the metadata of a file in a synchronized
+    // directory as of the last sync. hash is empty if not yet known.
+    struct FileRecord
+    {
+        std::string rpath;
+        std::string hash;
+        long long size = 0;
+        long long mtime = 0;
+        int permissions = 0;
+    };
+
     // REQ-SCAN: the server directory to scan and regexes of files to skip.
     struct ScanRequest
     {
@@ -126,6 +145,8 @@ namespace jsync_ns
     using ExpectBool = std::expected<bool, Error>;
     using ExpectIOContext = std::expected<IOContext, Error>;
     using ExpectChunk = std::expected<Chunk, Error>;
+    using ExpectSyncItems = std::expected<std::vector<SyncItem>, Error>;
+    using ExpectFileRecords = std::expected<std::vector<FileRecord>, Error>;
 
 }
 

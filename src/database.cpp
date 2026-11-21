@@ -21,17 +21,26 @@ namespace jsync_ns
                 value TEXT NOT NULL
             );
 
-            -- Metadata for each file or directory being synchronized.
-            -- directory is a boolean: client_path is a directory to be scanned
-            -- rather than a single file.
-            CREATE TABLE files (
+            -- Files and directories to be synchronized. directory is a
+            -- boolean: the paths are directories to be scanned rather than a
+            -- single file.
+            CREATE TABLE sync (
                 client_path TEXT PRIMARY KEY,
-                server_path TEXT,
+                server_path TEXT NOT NULL,
+                directory INTEGER NOT NULL
+            );
+
+            -- Metadata of each file in a synchronized directory as of the last
+            -- sync. client_path is the directory and rpath the file's path
+            -- relative to it.
+            CREATE TABLE files (
+                client_path TEXT NOT NULL,
+                rpath TEXT NOT NULL,
                 hash TEXT,
                 size INTEGER,
                 mtime INTEGER,
                 permissions INTEGER,
-                directory INTEGER
+                PRIMARY KEY (client_path, rpath)
             );
 
             -- Operations in progress, kept for recovery after a crash or error.
@@ -84,6 +93,118 @@ namespace jsync_ns
                                          init.error().ecode, init.error().kind});
         }
         return true;
+    }
+
+    ExpectBool Database::add(const std::string& client_path, const std::string& server_path)
+    {
+        if (db_ == nullptr)
+            return std::unexpected(Error{"Cannot add " + client_path + ": database is not open", EINVAL, ErrorKind::Errno});
+
+        // Follows symlinks, so a link to a directory counts as a directory.
+        std::error_code ec;
+        auto status = std::filesystem::status(client_path, ec);
+        if (ec)
+            return std::unexpected(Error{"Cannot add " + client_path + ": " + ec.message(), ec.value(), ErrorKind::Errno});
+
+        int directory;
+        if (std::filesystem::is_directory(status))
+            directory = 1;
+        else if (std::filesystem::is_regular_file(status))
+            directory = 0;
+        else
+            return std::unexpected(Error{"Cannot add " + client_path + ": not a regular file or directory", EINVAL, ErrorKind::Errno});
+
+        // A duplicate client_path violates the primary key and is an error.
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_, "INSERT INTO sync (client_path, server_path, directory) VALUES (?1, ?2, ?3)", -1, &stmt, nullptr);
+        if (rc == SQLITE_OK)
+            rc = bind_text(stmt, 1, client_path);
+        if (rc == SQLITE_OK)
+            rc = bind_text(stmt, 2, server_path);
+        if (rc == SQLITE_OK)
+            rc = sqlite3_bind_int(stmt, 3, directory);
+        if (rc == SQLITE_OK)
+        {
+            rc = sqlite3_step(stmt);
+            if (rc == SQLITE_DONE)
+                rc = SQLITE_OK;
+        }
+        if (rc != SQLITE_OK)
+        {
+            std::string msg = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
+            return std::unexpected(Error{"Cannot add " + client_path + ": " + msg, rc, ErrorKind::Sqlite});
+        }
+        sqlite3_finalize(stmt);
+        return true;
+    }
+
+    int Database::bind_text(sqlite3_stmt* stmt, int idx, const std::string& value)
+    {
+        return sqlite3_bind_text(stmt, idx, value.c_str(), static_cast<int>(value.size()), SQLITE_TRANSIENT);
+    }
+
+    namespace
+    {
+        std::string column_string(sqlite3_stmt* stmt, int col)
+        {
+            const unsigned char* text = sqlite3_column_text(stmt, col);
+            return text ? std::string(reinterpret_cast<const char*>(text), sqlite3_column_bytes(stmt, col)) : std::string();
+        }
+    }
+
+    ExpectSyncItems Database::sync_items()
+    {
+        if (db_ == nullptr)
+            return std::unexpected(Error{"Cannot read sync table: database is not open", EINVAL, ErrorKind::Errno});
+
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_, "SELECT client_path, server_path, directory FROM sync ORDER BY client_path", -1, &stmt, nullptr);
+        std::vector<SyncItem> items;
+        while (rc == SQLITE_OK && (rc = sqlite3_step(stmt)) == SQLITE_ROW)
+        {
+            items.push_back({column_string(stmt, 0), column_string(stmt, 1), sqlite3_column_int(stmt, 2) != 0});
+            rc = SQLITE_OK;
+        }
+        if (rc != SQLITE_DONE)
+        {
+            std::string msg = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
+            return std::unexpected(Error{"Cannot read sync table: " + msg, rc, ErrorKind::Sqlite});
+        }
+        sqlite3_finalize(stmt);
+        return items;
+    }
+
+    ExpectFileRecords Database::files_in(const std::string& client_path)
+    {
+        if (db_ == nullptr)
+            return std::unexpected(Error{"Cannot read files of " + client_path + ": database is not open", EINVAL, ErrorKind::Errno});
+
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_, "SELECT rpath, hash, size, mtime, permissions FROM files WHERE client_path = ?1 ORDER BY rpath", -1, &stmt, nullptr);
+        if (rc == SQLITE_OK)
+            rc = bind_text(stmt, 1, client_path);
+        std::vector<FileRecord> records;
+        while (rc == SQLITE_OK && (rc = sqlite3_step(stmt)) == SQLITE_ROW)
+        {
+            FileRecord r;
+            r.rpath = column_string(stmt, 0);
+            r.hash = column_string(stmt, 1);
+            r.size = sqlite3_column_int64(stmt, 2);
+            r.mtime = sqlite3_column_int64(stmt, 3);
+            r.permissions = sqlite3_column_int(stmt, 4);
+            records.push_back(std::move(r));
+            rc = SQLITE_OK;
+        }
+        if (rc != SQLITE_DONE)
+        {
+            std::string msg = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
+            return std::unexpected(Error{"Cannot read files of " + client_path + ": " + msg, rc, ErrorKind::Sqlite});
+        }
+        sqlite3_finalize(stmt);
+        return records;
     }
 
     ExpectBool Database::initialize(const std::string& ssh_connect)
