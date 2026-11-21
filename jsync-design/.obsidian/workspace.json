@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "overview.md",
+                "file": "Commands.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -28,7 +28,31 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "overview"
+              "title": "Commands"
+            }
+          },
+          {
+            "id": "94446303aea403d8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "database.md",
+                "mode": "preview",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "database"
             }
           },
           {
@@ -55,7 +79,8 @@
               "title": "Commands"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -182,7 +207,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "overview.md",
+                "file": "database.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -242,7 +267,7 @@
             "state": {
               "type": "file-properties",
               "state": {
-                "file": "overview.md"
+                "file": "database.md"
               },
               "icon": "lucide-info",
               "title": "File properties"
@@ -280,11 +305,12 @@
       "workspaces:Manage workspace layouts": false
     }
   },
-  "active": "ad25250807717669",
+  "active": "79fd365198eb7525",
   "lastOpenFiles": [
+    "Commands.md",
+    "database.md",
     "api.md.md",
     "overview.md",
-    "Commands.md",
     "Operation.md",
     "implementation.md",
     "journal/Had a party for Maegans birthday yesterday. Judy, Sam&Eric and maegans friend.md",
@@ -309,7 +335,6 @@
     "notes/IK Multimedia.md",
     "notes/Hyperphysics.md",
     "notes/Hyper History.md",
-    "notes/Help.GitHub - Git cheat sheets.md",
     "files/Transconductance.pdf",
     "manuals/eos 70D.pdf_20140524.pdf",
     "manuals/LG TV manuals_20180314.pdf",
