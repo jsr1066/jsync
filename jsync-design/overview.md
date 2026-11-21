@@ -21,17 +21,7 @@ There is a server process and client process that communicates with each other t
 The server process runs on the host **without** the database. It is remotly spawned by the client when the client starts.
 ### Client
 The client process manages the database and sends request/response messages to the server for file information. It also initiaizes any file transfers and updates the databse once the transfer completes and is verified.
-### Commands
 
-| Request | Response                  |
-| ------- | ------------------------- |
-| SCAN    | File listing and metadata |
-| HASH    | File hash                 |
-| READ    | File data                 |
-| WRITE   | Write file data           |
-| RENAME  | Rename temporary file     |
-| DELETE  | Delete file               |
-| QUIT    | Terminate process         |
 ## Components
 
 | Component             | Responsibility                             |
@@ -44,17 +34,22 @@ The client process manages the database and sends request/response messages to t
 |                       |                                            |
 # Command line args
 ```
-jsync create <local-path> <hostid>:<remote-path> --ip=<ipaddr> --port=<port>
-Create the SQLite database. No files are populated until the sync
+jsync create <path-to-database> <ssh-connect>
+Create the SQLite database. No files are populated until the sync.
+ssh-connect: The ssh user@host string for connection
 ```
-
 ```
-jsync sync <local-path> [--dry-run]
+jsync add <path-to-database> <local-path> <remote-path>
+Add a file or directory for syncing.
+local-path and remote-path are full pathnames and may be a file or a directory.
+```
+```
+jsync sync <path-to-database> [--dry-run]
 sync the files.
 ```
 
 ```
-jsync status <local-path> [--changes]
+jsync status <path-to-database> [--changes]
    Status of the archive
    status of the journal
    num directories
@@ -71,8 +66,10 @@ if --changes is used:
 ```
 
 ```
-jsync exclude <local-path> --show
-jsync exclude <local-path> <path-to-exclude>
+jsync exclude <path-to-database> --show
+--show: Display all excludes
+
+jsync add-exclude <path-to-database> <local-path-to-exclude> <remote-path-to-exclude>
 ```
 
 ```
