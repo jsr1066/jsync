@@ -43,7 +43,7 @@ namespace jsync_ns
             if (rel.empty() || rel.is_absolute()
                 || std::any_of(rel.begin(), rel.end(), [](const fs::path& part) { return part == ".."; }))
             {
-                return std::unexpected(Error{"invalid relative path: " + rpath, EINVAL});
+                return std::unexpected(Error{"invalid relative path: " + rpath, EINVAL, ErrorKind::Errno});
             }
             return fs::path(directory) / rel;
         }
@@ -64,7 +64,7 @@ namespace jsync_ns
             }
             catch (const std::regex_error& e)
             {
-                return fail("scan", Error{"invalid exclude regex '" + exclude + "': " + e.what(), static_cast<int>(e.code())});
+                return fail("scan", Error{"invalid exclude regex '" + exclude + "': " + e.what(), static_cast<int>(e.code()), ErrorKind::Regex});
             }
         }
 
@@ -73,13 +73,13 @@ namespace jsync_ns
         if (!fs::is_directory(root, ec))
         {
             int code = ec ? ec.value() : ENOTDIR;
-            return fail("scan", Error{"not a directory: " + directory, code});
+            return fail("scan", Error{"not a directory: " + directory, code, ErrorKind::Errno});
         }
 
         fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec);
         if (ec)
         {
-            return fail("scan", Error{"cannot read directory " + directory + ": " + ec.message(), ec.value()});
+            return fail("scan", Error{"cannot read directory " + directory + ": " + ec.message(), ec.value(), ErrorKind::Errno});
         }
 
         const fs::recursive_directory_iterator end;
@@ -115,7 +115,7 @@ namespace jsync_ns
             it.increment(ec);
             if (ec)
             {
-                return fail("scan", Error{"error scanning " + directory + ": " + ec.message(), ec.value()});
+                return fail("scan", Error{"error scanning " + directory + ": " + ec.message(), ec.value(), ErrorKind::Errno});
             }
         }
 
@@ -140,18 +140,18 @@ namespace jsync_ns
         if (::stat(full.c_str(), &st) != 0)
         {
             int code = errno;
-            return fail("hash", Error{"cannot stat " + full.string() + ": " + std::strerror(code), code});
+            return fail("hash", Error{"cannot stat " + full.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         if (!S_ISREG(st.st_mode))
         {
-            return fail("hash", Error{"not a regular file: " + full.string(), EINVAL});
+            return fail("hash", Error{"not a regular file: " + full.string(), EINVAL, ErrorKind::Errno});
         }
 
         std::ifstream in(full, std::ios::binary);
         if (!in)
         {
             int code = errno ? errno : EIO;
-            return fail("hash", Error{"cannot open " + full.string() + ": " + std::strerror(code), code});
+            return fail("hash", Error{"cannot open " + full.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
 
         Sha1 sha;
@@ -163,7 +163,7 @@ namespace jsync_ns
         }
         if (in.bad())
         {
-            return fail("hash", Error{"read error on " + full.string(), EIO});
+            return fail("hash", Error{"read error on " + full.string(), EIO, ErrorKind::Errno});
         }
 
         hash = sha.hex_digest();
@@ -185,18 +185,18 @@ namespace jsync_ns
         if (context.fd < 0)
         {
             int code = errno;
-            return fail("ropen", Error{"cannot open " + full.string() + ": " + std::strerror(code), code});
+            return fail("ropen", Error{"cannot open " + full.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
 
         struct stat st;
         if (::fstat(context.fd, &st) != 0)
         {
             int code = errno;
-            return fail("ropen", Error{"cannot stat " + full.string() + ": " + std::strerror(code), code});
+            return fail("ropen", Error{"cannot stat " + full.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         if (!S_ISREG(st.st_mode))
         {
-            return fail("ropen", Error{"not a regular file: " + full.string(), EINVAL});
+            return fail("ropen", Error{"not a regular file: " + full.string(), EINVAL, ErrorKind::Errno});
         }
 
         context.directory = directory;
@@ -215,7 +215,7 @@ namespace jsync_ns
 
         if (context.fd < 0)
         {
-            return fail("read", Error{"read on closed context", EBADF});
+            return fail("read", Error{"read on closed context", EBADF, ErrorKind::Errno});
         }
 
         // Fill the whole chunk unless EOF intervenes; read(2) may return short counts.
@@ -230,7 +230,7 @@ namespace jsync_ns
                     continue;
                 }
                 int code = errno;
-                return fail("read", Error{"read error on " + context.rpath + ": " + std::strerror(code), code});
+                return fail("read", Error{"read error on " + context.rpath + ": " + std::strerror(code), code, ErrorKind::Errno});
             }
             if (n == 0)
             {
@@ -259,7 +259,7 @@ namespace jsync_ns
         fs::create_directories(temp.parent_path(), ec);
         if (ec)
         {
-            return fail("wopen", Error{"cannot create directory " + temp.parent_path().string() + ": " + ec.message(), ec.value()});
+            return fail("wopen", Error{"cannot create directory " + temp.parent_path().string() + ": " + ec.message(), ec.value(), ErrorKind::Errno});
         }
 
         IOContext context;
@@ -267,7 +267,7 @@ namespace jsync_ns
         if (context.fd < 0)
         {
             int code = errno;
-            return fail("wopen", Error{"cannot open " + temp.string() + ": " + std::strerror(code), code});
+            return fail("wopen", Error{"cannot open " + temp.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
 
         context.directory = directory;
@@ -284,12 +284,12 @@ namespace jsync_ns
 
         if (context.fd < 0)
         {
-            return fail("write", Error{"write on closed context", EBADF});
+            return fail("write", Error{"write on closed context", EBADF, ErrorKind::Errno});
         }
         if (chunk.chunk_size > MAX_CHUNK
             || chunk.chunk_size > context.total_size - context.bytes_done)
         {
-            return fail("write", Error{"too much data for " + context.rpath, EFBIG});
+            return fail("write", Error{"too much data for " + context.rpath, EFBIG, ErrorKind::Errno});
         }
 
         size_t written = 0;
@@ -303,7 +303,7 @@ namespace jsync_ns
                     continue;
                 }
                 int code = errno;
-                return fail("write", Error{"write error on " + context.temp_path + ": " + std::strerror(code), code});
+                return fail("write", Error{"write error on " + context.temp_path + ": " + std::strerror(code), code, ErrorKind::Errno});
             }
             written += static_cast<size_t>(n);
         }
@@ -322,13 +322,13 @@ namespace jsync_ns
             ::close(context.fd);
             context.fd = -1;
             ::unlink(context.temp_path.c_str());
-            return fail("write", Error{"hash mismatch on " + context.rpath + ": expected " + context.expected_hash + ", got " + actual, EBADMSG});
+            return fail("write", Error{"hash mismatch on " + context.rpath + ": expected " + context.expected_hash + ", got " + actual, EBADMSG, ErrorKind::Errno});
         }
         if (::fsync(context.fd) != 0 || ::close(context.fd) != 0)
         {
             int code = errno;
             context.fd = -1;
-            return fail("write", Error{"cannot flush " + context.temp_path + ": " + std::strerror(code), code});
+            return fail("write", Error{"cannot flush " + context.temp_path + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         context.fd = -1;
         return false;
@@ -351,7 +351,7 @@ namespace jsync_ns
         if (::rename(temp.c_str(), full.c_str()) != 0)
         {
             int code = errno;
-            return fail("rename", Error{"cannot rename " + temp.string() + " to " + full.string() + ": " + std::strerror(code), code});
+            return fail("rename", Error{"cannot rename " + temp.string() + " to " + full.string() + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         return true;
     }

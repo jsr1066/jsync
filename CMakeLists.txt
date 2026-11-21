@@ -7,15 +7,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(spdlog REQUIRED)
+find_package(SQLite3 REQUIRED)
 
 add_library(jsync_core
     src/file_ops.cpp
     src/sha1.cpp
     src/peer.cpp
     src/wire.cpp
+    src/database.cpp
 )
 target_include_directories(jsync_core PUBLIC src)
-target_link_libraries(jsync_core PUBLIC spdlog::spdlog)
+target_link_libraries(jsync_core PUBLIC spdlog::spdlog SQLite::SQLite3)
 target_compile_options(jsync_core PRIVATE -Wall -Wextra)
 
 add_executable(jsync src/main.cpp)

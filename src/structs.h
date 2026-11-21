@@ -13,10 +13,19 @@
 
 namespace jsync_ns
 {
+    // How Error::ecode is to be interpreted.
+    enum class ErrorKind
+    {
+        Errno,  // an errno value (EINVAL, ENOENT, ...)
+        Sqlite, // an SQLite result code (SQLITE_CANTOPEN, ...), possibly extended
+        Regex,  // a std::regex_constants::error_type value (error_paren, ...)
+    };
+
     struct Error
     {
         std::string err;
         int ecode;
+        ErrorKind kind;
     };
 
     struct ScanInfo

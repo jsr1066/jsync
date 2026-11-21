@@ -13,7 +13,7 @@ namespace jsync_ns
         std::unexpected<Error> fail(std::string message, int code)
         {
             spdlog::error("wire: {} (code {})", message, code);
-            return std::unexpected(Error{std::move(message), code});
+            return std::unexpected(Error{std::move(message), code, ErrorKind::Errno});
         }
 
         // Appends "key=value<FS>". The value must not contain the delimiters.

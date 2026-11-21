@@ -45,7 +45,7 @@ namespace jsync_ns
         std::unexpected<Error> fail(const char* command, std::string message, int code)
         {
             spdlog::error("{}: {} (code {})", command, message, code);
-            return std::unexpected(Error{std::move(message), code});
+            return std::unexpected(Error{std::move(message), code, ErrorKind::Errno});
         }
 
         std::unexpected<Error> fail_errno(const char* command, const char* what, int code)

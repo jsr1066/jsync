@@ -97,6 +97,7 @@ int main()
         if (!res.has_value())
         {
             CHECK(res.error().ecode != 0);
+            CHECK(res.error().kind == ErrorKind::Errno);
         }
     }
 
