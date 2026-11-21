@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "structs.h"
 
@@ -40,6 +41,12 @@ namespace jsync_ns
         // Returns the stored metadata of every file in the directory
         // client_path (a sync item with directory true), ordered by rpath.
         ExpectFileRecords files_in(const std::string& client_path);
+
+        // Writes records to the files table for the directory client_path, in
+        // one transaction: a record whose rpath is already stored replaces it,
+        // others are inserted. An empty hash is stored as NULL. Files not in
+        // records are left alone. Nothing is written if any record fails.
+        ExpectBool put_files(const std::string& client_path, const std::vector<FileRecord>& records);
 
         bool is_open() const;
 

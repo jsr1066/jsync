@@ -15,19 +15,6 @@ static int failures = 0;
 #define CHECK(cond) \
     do { if (!(cond)) { std::cerr << __FILE__ << ":" << __LINE__ << " CHECK failed: " #cond "\n"; ++failures; } } while (0)
 
-// Inserts rows into the files table directly; there is no API for it yet.
-static void seed_files(const std::string& db_path)
-{
-    sqlite3* db = nullptr;
-    sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr);
-    sqlite3_exec(db,
-        "INSERT INTO files VALUES ('/a', 'z.txt', 'h1', 10, 100, 420);"
-        "INSERT INTO files VALUES ('/a', 'sub/b.txt', 'h2', 20, 200, 384);"
-        "INSERT INTO files VALUES ('/b', 'other.txt', NULL, NULL, NULL, NULL);",
-        nullptr, nullptr, nullptr);
-    sqlite3_close(db);
-}
-
 int main()
 {
     fs::path root = fs::temp_directory_path() / ("jsync-test-database-" + std::to_string(::getpid()));
@@ -93,8 +80,14 @@ int main()
     CHECK(!db.sync_items());
     CHECK(!db.files_in(dir));
 
-    seed_files(db_path);
+    // Empty before anything is written.
     CHECK(db.open(db_path));
+    CHECK(db.put_files("/a", {}));
+    auto empty = db.files_in("/a");
+    CHECK(empty.has_value() && empty->empty());
+
+    CHECK(db.put_files("/a", {{"z.txt", "h1", 10, 100, 420}, {"sub/b.txt", "h2", 20, 200, 384}}));
+    CHECK(db.put_files("/b", {{"other.txt", "", 0, 0, 0}}));
 
     auto recs = db.files_in("/a");
     CHECK(recs.has_value());
@@ -111,6 +104,20 @@ int main()
     else
         CHECK(false);
 
+    // Writing again replaces matching rpaths, adds new ones, keeps the rest.
+    CHECK(db.put_files("/a", {{"z.txt", "h1b", 11, 101, 420}, {"new.txt", "h3", 1, 2, 3}}));
+    recs = db.files_in("/a");
+    CHECK(recs.has_value() && recs->size() == 3);
+    if (recs && recs->size() == 3)
+    {
+        CHECK((*recs)[0].rpath == "new.txt");
+        CHECK((*recs)[1].rpath == "sub/b.txt");
+        CHECK((*recs)[1].hash == "h2");
+        CHECK((*recs)[2].rpath == "z.txt");
+        CHECK((*recs)[2].hash == "h1b");
+        CHECK((*recs)[2].size == 11);
+    }
+
     // A NULL hash reads back as empty; other directories are not mixed in.
     auto other = db.files_in("/b");
     CHECK(other.has_value() && other->size() == 1);
@@ -119,6 +126,7 @@ int main()
     auto unknown = db.files_in("/nope");
     CHECK(unknown.has_value() && unknown->empty());
     db.close();
+    CHECK(!db.put_files("/a", {{"x", "h", 1, 1, 1}}));
 
     fs::remove_all(root);
     if (failures == 0)

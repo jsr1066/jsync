@@ -207,6 +207,52 @@ namespace jsync_ns
         return records;
     }
 
+    ExpectBool Database::put_files(const std::string& client_path, const std::vector<FileRecord>& records)
+    {
+        if (db_ == nullptr)
+            return std::unexpected(Error{"Cannot write files of " + client_path + ": database is not open", EINVAL, ErrorKind::Errno});
+
+        if (auto r = exec("BEGIN"); !r)
+            return r;
+
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_,
+            "INSERT OR REPLACE INTO files (client_path, rpath, hash, size, mtime, permissions) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            -1, &stmt, nullptr);
+        for (size_t i = 0; rc == SQLITE_OK && i < records.size(); ++i)
+        {
+            const FileRecord& rec = records[i];
+            rc = bind_text(stmt, 1, client_path);
+            if (rc == SQLITE_OK)
+                rc = bind_text(stmt, 2, rec.rpath);
+            if (rc == SQLITE_OK)
+                rc = rec.hash.empty() ? sqlite3_bind_null(stmt, 3) : bind_text(stmt, 3, rec.hash);
+            if (rc == SQLITE_OK)
+                rc = sqlite3_bind_int64(stmt, 4, rec.size);
+            if (rc == SQLITE_OK)
+                rc = sqlite3_bind_int64(stmt, 5, rec.mtime);
+            if (rc == SQLITE_OK)
+                rc = sqlite3_bind_int(stmt, 6, rec.permissions);
+            if (rc == SQLITE_OK)
+            {
+                rc = sqlite3_step(stmt);
+                if (rc == SQLITE_DONE)
+                    rc = SQLITE_OK;
+            }
+            if (rc == SQLITE_OK)
+                rc = sqlite3_reset(stmt);
+        }
+        if (rc != SQLITE_OK)
+        {
+            std::string msg = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
+            exec("ROLLBACK");
+            return std::unexpected(Error{"Cannot write files of " + client_path + ": " + msg, rc, ErrorKind::Sqlite});
+        }
+        sqlite3_finalize(stmt);
+        return exec("COMMIT");
+    }
+
     ExpectBool Database::initialize(const std::string& ssh_connect)
     {
         if (auto r = exec("BEGIN"); !r)
