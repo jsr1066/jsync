@@ -205,13 +205,14 @@ namespace jsync_ns
         return context;
     }
 
-    ExpectBool FileOps::read(const IOContext& context, Chunk& chunk)
+    ExpectBool FileOps::read(IOContext& context, Chunk& chunk)
     {
         spdlog::debug("read: directory={} rpath={}", context.directory, context.rpath);
         chunk.directory = context.directory;
         chunk.rpath = context.rpath;
         chunk.total_size = context.total_size;
         chunk.chunk_size = 0;
+        chunk.hash.clear();
 
         if (context.fd < 0)
         {
@@ -240,6 +241,14 @@ namespace jsync_ns
         }
 
         chunk.chunk_size = filled;
+        context.sha.update(chunk.bytes, filled);
+        context.bytes_done += filled;
+        if (filled == 0 || context.bytes_done >= context.total_size)
+        {
+            // hex_digest() finalizes, so use a copy in case read() is called again.
+            Sha1 done = context.sha;
+            chunk.hash = done.hex_digest();
+        }
         return filled > 0;
     }
 

@@ -80,9 +80,9 @@ namespace jsync_ns
         std::string rpath;
         size_t total_size = 0;
 
-        // Write state (unused when reading): the hash the finished file must
-        // have, the bytes and running hash accumulated so far, and the temp file
-        // being written.
+        // The bytes and running hash accumulated so far (read and write). Write
+        // only: the hash the finished file must have, and the temp file being
+        // written.
         std::string expected_hash;
         size_t bytes_done = 0;
         Sha1 sha;
@@ -140,6 +140,9 @@ namespace jsync_ns
         std::string rpath;
         size_t total_size;
         size_t chunk_size;
+        // Set by FileOps::read once the whole file has been read (the chunk that
+        // reaches total_size); empty otherwise.
+        std::string hash;
         char bytes[MAX_CHUNK];
     };
 

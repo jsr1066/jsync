@@ -21,7 +21,9 @@ namespace jsync_ns
 
         // Fills chunk with the next up to MAX_CHUNK bytes. Returns true if the
         // chunk holds data (call again for more), false at EOF (chunk_size == 0).
-        ExpectBool read(const IOContext& context, Chunk& chunk);
+        // Updates the running hash in context; the chunk that reaches the end of
+        // the file (and the EOF chunk) carries the SHA-1 in chunk.hash.
+        ExpectBool read(IOContext& context, Chunk& chunk);
 
         // Opens a temp file next to directory/rpath for writing (creating parent
         // directories as needed). The file must end up total_size bytes long with

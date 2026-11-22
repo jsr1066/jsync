@@ -34,7 +34,7 @@ static std::string make_data(size_t n)
 
 // Reads the whole file through ropen()/read(); returns the contents and chunk count.
 static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rpath,
-                     std::string& out, int& chunks, size_t& total)
+                     std::string& out, int& chunks, size_t& total, std::string& hash)
 {
     auto ctx = cmd.ropen(dir, rpath);
     if (!ctx)
@@ -44,6 +44,7 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
     total = ctx->total_size;
     auto chunk = std::make_unique<Chunk>();
     out.clear();
+    hash.clear();
     chunks = 0;
     while (true)
     {
@@ -55,6 +56,10 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
         if (!*more)
         {
             CHECK(chunk->chunk_size == 0);
+            // The EOF chunk repeats the hash reported by the last data chunk.
+            CHECK(!chunk->hash.empty());
+            CHECK(hash.empty() || hash == chunk->hash);
+            hash = chunk->hash;
             return true;
         }
         CHECK(chunk->rpath == rpath);
@@ -62,6 +67,12 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
         CHECK(chunk->total_size == total);
         out.append(chunk->bytes, chunk->chunk_size);
         chunks++;
+        // The hash is only reported on the chunk that completes the file.
+        CHECK(chunk->hash.empty() == (out.size() < total));
+        if (!chunk->hash.empty())
+        {
+            hash = chunk->hash;
+        }
     }
 }
 
@@ -82,18 +93,32 @@ int main()
     std::string out;
     int chunks = 0;
     size_t total = 0;
+    std::string hash;
+    std::string expected;
 
-    CHECK(read_all(cmd, root.string(), "empty", out, chunks, total));
+    // chunk.hash must match FileOps::hash for the same file.
+    auto check_hash = [&](const char* rpath)
+    {
+        CHECK(cmd.hash(root.string(), rpath, expected).has_value());
+        CHECK(hash.size() == 40);
+        CHECK(hash == expected);
+    };
+
+    CHECK(read_all(cmd, root.string(), "empty", out, chunks, total, hash));
     CHECK(out.empty() && chunks == 0 && total == 0);
+    check_hash("empty");
 
-    CHECK(read_all(cmd, root.string(), "small", out, chunks, total));
+    CHECK(read_all(cmd, root.string(), "small", out, chunks, total, hash));
     CHECK(out == small && chunks == 1 && total == small.size());
+    check_hash("small");
 
-    CHECK(read_all(cmd, root.string(), "sub/exact", out, chunks, total));
+    CHECK(read_all(cmd, root.string(), "sub/exact", out, chunks, total, hash));
     CHECK(out == exact && chunks == 1 && total == exact.size());
+    check_hash("sub/exact");
 
-    CHECK(read_all(cmd, root.string(), "multi", out, chunks, total));
+    CHECK(read_all(cmd, root.string(), "multi", out, chunks, total, hash));
     CHECK(out == multi && chunks == 3 && total == multi.size());
+    check_hash("multi");
 
     // ropen() errors.
     CHECK(!cmd.ropen(root.string(), "nope").has_value());
