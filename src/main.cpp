@@ -1,14 +1,17 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
 
 #include <spdlog/spdlog.h>
 
+#include "database.h"
 #include "file_ops.h"
 #include "peer.h"
+#include "scan.h"
 #include "wire.h"
 
 using namespace jsync_ns;
@@ -222,6 +225,74 @@ namespace
         }
         return test_scan_client(peer);
     }
+
+    constexpr char PLAN_DB[] = "/Users/jeff/jsync.sq3";
+    constexpr char PLAN_CLIENT_PATH[] = "/Users/jeff/Projects/jsync";
+    constexpr char PLAN_SERVER_PATH[] = "/home/jeff/Projects/jsync2";
+
+    const char* action_name(ActionType type)
+    {
+        switch (type)
+        {
+        case ActionType::ReadFromServer: return "read from server";
+        case ActionType::WriteToServer:  return "write to server";
+        case ActionType::DeleteLocal:    return "delete local";
+        case ActionType::DeleteServer:   return "delete server";
+        case ActionType::Conflict:       return "conflict";
+        }
+        return "?";
+    }
+
+    // Client: opens (or creates) the database, makes sure the test directory is
+    // in the sync table, scans both sides and prints the planned actions.
+    // Server: answers the scan requests until the client disconnects.
+    int test_plan(const Options& opts)
+    {
+        Peer peer;
+        if (opts.server)
+        {
+            if (!peer.accept())
+            {
+                return 1;
+            }
+            while (test_scan_server(peer) == 0)
+            {
+            }
+            return 0;
+        }
+
+        Database db;
+        auto opened = std::filesystem::exists(PLAN_DB) ? db.open(PLAN_DB) : db.create(PLAN_DB, DEFAULT_HOST);
+        if (!opened)
+        {
+            std::fprintf(stderr, "database %s: %s\n", PLAN_DB, opened.error().err.c_str());
+            return 1;
+        }
+        // Fails if the directory is already in the table (a rerun); that is fine.
+        if (auto r = db.add(PLAN_CLIENT_PATH, PLAN_SERVER_PATH, {".trash"}); !r)
+        {
+            std::fprintf(stderr, "add: %s (continuing)\n", r.error().err.c_str());
+        }
+
+        if (!peer.connect(DEFAULT_HOST))
+        {
+            return 1;
+        }
+
+        Scan scan(db, peer);
+        auto actions = scan.plan();
+        if (!actions)
+        {
+            std::fprintf(stderr, "plan failed: %s\n", actions.error().err.c_str());
+            return 1;
+        }
+        for (const Action& a : *actions)
+        {
+            std::printf("%-16s %s\n", action_name(a.type), a.rpath.c_str());
+        }
+        std::printf("%zu actions\n", actions->size());
+        return 0;
+    }
 }
 
 int main(int argc, char** argv)
@@ -234,5 +305,6 @@ int main(int argc, char** argv)
     }
 
     (void)&test_startup;
-    return test_scan(opts);
+    (void)&test_scan;
+    return test_plan(opts);
 }
