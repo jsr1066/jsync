@@ -269,9 +269,14 @@ namespace
             return 1;
         }
         // Fails if the directory is already in the table (a rerun); that is fine.
-        if (auto r = db.add(PLAN_CLIENT_PATH, PLAN_SERVER_PATH, {".trash"}); !r)
+        if (auto r = db.add(PLAN_CLIENT_PATH, PLAN_SERVER_PATH); !r)
         {
             std::fprintf(stderr, "add: %s (continuing)\n", r.error().err.c_str());
+        }
+
+        if (auto r = db.set_excludes(PLAN_CLIENT_PATH, {"build", ".trash", ".git", ".DS_Store", ".cache"}); !r)
+        {
+            std::fprintf(stderr, "set: %s (continuing)\n", r.error().err.c_str());
         }
 
         if (!peer.connect(DEFAULT_HOST))
