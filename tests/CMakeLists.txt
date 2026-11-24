@@ -32,3 +32,8 @@ add_executable(test_database test_database.cpp)
 target_link_libraries(test_database PRIVATE jsync_core)
 target_compile_options(test_database PRIVATE -Wall -Wextra)
 add_test(NAME database COMMAND test_database)
+
+add_executable(test_scan_plan test_scan_plan.cpp)
+target_link_libraries(test_scan_plan PRIVATE jsync_core)
+target_compile_options(test_scan_plan PRIVATE -Wall -Wextra)
+add_test(NAME scan_plan COMMAND test_scan_plan)

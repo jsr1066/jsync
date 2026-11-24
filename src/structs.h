@@ -57,6 +57,24 @@ namespace jsync_ns
         int permissions = 0;
     };
 
+    // What Scan::plan decides to do about one file of a synchronized directory.
+    enum class ActionType
+    {
+        ReadFromServer, // copy server -> local
+        WriteToServer,  // copy local -> server
+        DeleteLocal,
+        DeleteServer,
+        Conflict,       // changed on both sides (or changed on one and deleted on the other)
+    };
+
+    struct Action
+    {
+        ActionType type;
+        std::string client_path; // the sync item (directory) the file belongs to
+        std::string server_path;
+        std::string rpath;       // relative to the directory
+    };
+
     // REQ-SCAN: the server directory to scan and regexes of files to skip.
     struct ScanRequest
     {
@@ -151,6 +169,7 @@ namespace jsync_ns
     using ExpectChunk = std::expected<Chunk, Error>;
     using ExpectSyncItems = std::expected<std::vector<SyncItem>, Error>;
     using ExpectFileRecords = std::expected<std::vector<FileRecord>, Error>;
+    using ExpectActions = std::expected<std::vector<Action>, Error>;
 
 }
 

@@ -15,6 +15,7 @@ add_library(jsync_core
     src/peer.cpp
     src/wire.cpp
     src/database.cpp
+    src/scan.cpp
 )
 target_include_directories(jsync_core PUBLIC src)
 target_link_libraries(jsync_core PUBLIC spdlog::spdlog SQLite::SQLite3)

@@ -2,6 +2,7 @@
 ## Settings
 Database-wide key/value settings.
 - ssh_connect: the ssh user@host string of the remote, set by `jsync create`. It does not change.
+- last_sync_time: The time of the last sync. File mtimes are compared to this.
 ```
 CREATE TABLE settings (
     key TEXT PRIMARY KEY,
