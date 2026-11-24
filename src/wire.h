@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "structs.h"
@@ -32,6 +34,35 @@ namespace jsync_ns
     // Builds a DATA-SCAN entry (one per file, status=continue).
     ExpectBool convertToWire(const ScanInfo&, std::vector<uint8_t>& out);
 
+    // Builds a REQ-WRITE: directory, file, hash, total_size, mtime and permission,
+    // all mandatory.
+    ExpectBool convertToWire(const WriteRequest&, std::vector<uint8_t>& out);
+
+    // Builds an RSP-READ: status=complete with hash, mtime and permission, or
+    // status=fail with text if non-empty.
+    ExpectBool convertToWire(const ReadResponse&, std::vector<uint8_t>& out);
+
     // Builds the final RSP-SCAN (status=complete|fail, text if non-empty).
     ExpectBool convertToWire(const ScanResponse&, std::vector<uint8_t>& out);
+
+    // The inverse of convertToWire: fill a struct from the key/value pairs that
+    // read_command returns. Each returns an EPROTO error if a mandatory key is
+    // missing or a value is malformed; the struct is only modified on success.
+    using KeyValues = std::map<std::string, std::string>;
+
+    // REQ-SCAN: directory mandatory, excludes optional (split on EXCLUDE_SEP).
+    ExpectBool convertFromWire(const KeyValues&, ScanRequest&);
+
+    // DATA-SCAN: file, size, mtime, permission. info.directory is not on the
+    // wire and is left untouched.
+    ExpectBool convertFromWire(const KeyValues&, ScanInfo&);
+
+    // RSP-SCAN: status=complete|fail, text optional.
+    ExpectBool convertFromWire(const KeyValues&, ScanResponse&);
+
+    // REQ-WRITE: directory, file, hash (40 lowercase hex), total_size, mtime, permission.
+    ExpectBool convertFromWire(const KeyValues&, WriteRequest&);
+
+    // RSP-READ: directory, file, status; hash, mtime, permission also when complete.
+    ExpectBool convertFromWire(const KeyValues&, ReadResponse&);
 }

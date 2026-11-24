@@ -89,6 +89,31 @@ namespace jsync_ns
         std::string text;
     };
 
+    // REQ-WRITE: asks the server to receive a file of total_size bytes. The server
+    // verifies hash and then applies mtime and permission to the file.
+    struct WriteRequest
+    {
+        std::string directory;
+        std::string rpath;
+        std::string hash;
+        size_t total_size = 0;
+        time_t mtime = 0;
+        int permission = 0;
+    };
+
+    // RSP-READ: the final message of a file read. hash, mtime and permission are
+    // only sent when ok; text only when not ok.
+    struct ReadResponse
+    {
+        std::string directory;
+        std::string rpath;
+        bool ok = true;
+        std::string hash;
+        time_t mtime = 0;
+        int permission = 0;
+        std::string text;
+    };
+
     // State for reading or writing  a file chunk by chunk. Owns the file descriptor and
     // closes it on destruction, so it is move-only.
     struct IOContext

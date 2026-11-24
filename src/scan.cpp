@@ -17,19 +17,6 @@ namespace jsync_ns
             return std::unexpected(Error{std::move(message), code, ErrorKind::Errno});
         }
 
-        // Parses a decimal integer; false if v is empty or malformed.
-        bool parse_int(const std::string& v, long long& out)
-        {
-            if (v.empty())
-            {
-                return false;
-            }
-            char* end = nullptr;
-            errno = 0;
-            out = std::strtoll(v.c_str(), &end, 10);
-            return errno == 0 && *end == '\0';
-        }
-
         bool differs(const ScanInfo& s, const FileRecord& r)
         {
             return static_cast<long long>(s.size) != r.size || static_cast<long long>(s.mtime) != r.mtime;
@@ -112,18 +99,12 @@ namespace jsync_ns
 
             if (command == "DATA-SCAN")
             {
-                long long size = 0, mtime = 0, perm = 0;
-                if (!kv.contains("file") || !parse_int(kv["size"], size) || !parse_int(kv["mtime"], mtime)
-                    || !parse_int(kv["permission"], perm))
-                {
-                    return fail("malformed DATA-SCAN from server", EPROTO);
-                }
                 ScanInfo info;
                 info.directory = item.server_path;
-                info.rpath = kv["file"];
-                info.permission = static_cast<int>(perm);
-                info.size = static_cast<size_t>(size);
-                info.mtime = static_cast<time_t>(mtime);
+                if (auto r = convertFromWire(kv, info); !r)
+                {
+                    return std::unexpected(r.error());
+                }
                 results.push_back(std::move(info));
                 continue;
             }

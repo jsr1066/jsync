@@ -143,6 +143,7 @@ This is a request to transfer a file from the client to the server.
 |directory=\<path\>|Mandatory|
 |file=\<relative-path\>|Mandatory|
 |hash=\<hash\> | Mandatory|
+|total_size=\<size\> | Mandatory. Size of the file to be sent; the server rejects more data than this|
 |mtime=\<mtime\> | Mandatory. Applied to the file once the hash verifies|
 |permission=\<perm\> | Mandatory. Applied with mtime; setuid/setgid/sticky bits are ignored|
 
