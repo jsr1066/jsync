@@ -89,6 +89,22 @@ namespace jsync_ns
         std::string text;
     };
 
+    // REQ-READ: asks the server for a file.
+    struct ReadRequest
+    {
+        std::string directory;
+        std::string rpath;
+    };
+
+    // RSP-WRITE: the final message of a file write. text only when not ok.
+    struct WriteResponse
+    {
+        std::string directory;
+        std::string rpath;
+        bool ok = true;
+        std::string text;
+    };
+
     // REQ-WRITE: asks the server to receive a file of total_size bytes. The server
     // verifies hash and then applies mtime and permission to the file.
     struct WriteRequest

@@ -1,4 +1,5 @@
 #include "peer.h"
+#include "file_ops.h"
 #include "wire.h"
 
 #include <cerrno>
@@ -6,7 +7,9 @@
 #include <chrono>
 #include <csignal>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 #include <fcntl.h>
@@ -78,6 +81,19 @@ namespace jsync_ns
                 ::close(fd);
                 fd = -1;
             }
+        }
+
+        // Error text goes into a field of a wire message, so it can't hold the delimiters.
+        std::string flatten(std::string text)
+        {
+            for (char& c : text)
+            {
+                if (c == '\n' || c == FIELD_SEP)
+                {
+                    c = ' ';
+                }
+            }
+            return text;
         }
 
         std::string describe_status(int status)
@@ -451,5 +467,376 @@ namespace jsync_ns
             }
         }
         return true;
+    }
+
+    namespace
+    {
+        // Removes the temp file of an unfinished write, if one was opened.
+        void discard(std::optional<IOContext>& ctx)
+        {
+            if (ctx && !ctx->temp_path.empty())
+            {
+                ::unlink(ctx->temp_path.c_str());
+            }
+        }
+    }
+
+    ExpectBool Peer::read_file(const std::string& server_dir, const std::string& local_dir, const std::string& rpath)
+    {
+        static constexpr char NAME[] = "read_file";
+        std::vector<uint8_t> wire;
+        if (auto r = convertToWire(ReadRequest{server_dir, rpath}, wire); !r)
+        {
+            return r;
+        }
+        if (auto r = send(wire.data(), wire.size()); !r)
+        {
+            return r;
+        }
+
+        FileOps ops;
+        std::optional<IOContext> ctx;
+        auto chunk = std::make_unique<Chunk>();
+        bool done = false; // the whole file has been written to the temp file
+
+        for (;;)
+        {
+            std::string command;
+            std::map<std::string, std::string> kv;
+            std::vector<uint8_t> data;
+            if (auto r = read_command(*this, command, kv, data); !r)
+            {
+                discard(ctx);
+                return r;
+            }
+
+            if (command == "DATA-CHUNK")
+            {
+                if (done)
+                {
+                    discard(ctx);
+                    return fail(NAME, "data after the end of " + rpath, EPROTO);
+                }
+                if (auto r = convertFromWire(kv, data, *chunk); !r)
+                {
+                    discard(ctx);
+                    return r;
+                }
+                if (chunk->rpath != rpath)
+                {
+                    discard(ctx);
+                    return fail(NAME, "received " + chunk->rpath + " while reading " + rpath, EPROTO);
+                }
+                if (!ctx)
+                {
+                    // The hash is not known until the final chunk.
+                    auto opened = ops.wopen(local_dir, rpath, chunk->total_size, "", chunk->mtime, chunk->permission);
+                    if (!opened)
+                    {
+                        return std::unexpected(opened.error());
+                    }
+                    ctx.emplace(std::move(*opened));
+                }
+                else if (chunk->total_size != ctx->total_size)
+                {
+                    discard(ctx);
+                    return fail(NAME, "total_size of " + rpath + " changed during transfer", EPROTO);
+                }
+
+                if (!chunk->hash.empty())
+                {
+                    ctx->expected_hash = chunk->hash;
+                }
+                else if (ctx->bytes_done + chunk->chunk_size == ctx->total_size)
+                {
+                    discard(ctx);
+                    return fail(NAME, "final chunk of " + rpath + " has no hash", EPROTO);
+                }
+                auto more = ops.write(*ctx, *chunk);
+                if (!more)
+                {
+                    discard(ctx);
+                    return more;
+                }
+                done = !*more;
+                continue;
+            }
+
+            if (command != "RSP-READ")
+            {
+                discard(ctx);
+                return fail(NAME, "unexpected message while reading " + rpath + ": " + command, EPROTO);
+            }
+
+            ReadResponse rsp;
+            if (auto r = convertFromWire(kv, rsp); !r)
+            {
+                discard(ctx);
+                return r;
+            }
+            if (!rsp.ok)
+            {
+                discard(ctx);
+                return fail(NAME, "server could not read " + rpath + ": " + rsp.text, EIO);
+            }
+            if (!done || rsp.hash != ctx->expected_hash || rsp.mtime != ctx->mtime || rsp.permission != ctx->permission)
+            {
+                discard(ctx);
+                return fail(NAME, "RSP-READ for " + rpath + " does not match the data received", EPROTO);
+            }
+            auto renamed = ops.rename(local_dir, rpath);
+            if (!renamed)
+            {
+                discard(ctx);
+            }
+            return renamed;
+        }
+    }
+
+    ExpectBool Peer::write_file(const std::string& local_dir, const std::string& server_dir, const std::string& rpath)
+    {
+        static constexpr char NAME[] = "write_file";
+        FileOps ops;
+        std::string hash;
+        if (auto r = ops.hash(local_dir, rpath, hash); !r)
+        {
+            return r;
+        }
+        auto ctx = ops.ropen(local_dir, rpath);
+        if (!ctx)
+        {
+            return std::unexpected(ctx.error());
+        }
+
+        std::vector<uint8_t> wire;
+        WriteRequest req{server_dir, rpath, hash, ctx->total_size, ctx->mtime, ctx->permission};
+        if (auto r = convertToWire(req, wire); !r)
+        {
+            return r;
+        }
+        if (auto r = send(wire.data(), wire.size()); !r)
+        {
+            return r;
+        }
+
+        auto chunk = std::make_unique<Chunk>();
+        for (;;)
+        {
+            auto more = ops.read(*ctx, *chunk);
+            if (!more)
+            {
+                return more;
+            }
+            // An empty file is sent as a single empty chunk; otherwise the
+            // empty chunk at EOF is not needed, as the last data chunk is final.
+            if (chunk->chunk_size > 0 || ctx->total_size == 0)
+            {
+                chunk->directory = server_dir;
+                if (auto r = convertToWire(*chunk, wire); !r)
+                {
+                    return r;
+                }
+                if (auto r = send(wire.data(), wire.size()); !r)
+                {
+                    return r;
+                }
+            }
+            if (!chunk->hash.empty())
+            {
+                break;
+            }
+        }
+        if (ctx->bytes_done != ctx->total_size)
+        {
+            return fail(NAME, rpath + " changed while it was being sent", EIO);
+        }
+
+        std::string command;
+        std::map<std::string, std::string> kv;
+        std::vector<uint8_t> data;
+        if (auto r = read_command(*this, command, kv, data); !r)
+        {
+            return r;
+        }
+        if (command != "RSP-WRITE")
+        {
+            return fail(NAME, "unexpected response to REQ-WRITE: " + command, EPROTO);
+        }
+        WriteResponse rsp;
+        if (auto r = convertFromWire(kv, rsp); !r)
+        {
+            return r;
+        }
+        if (!rsp.ok)
+        {
+            return fail(NAME, "server could not write " + rpath + ": " + rsp.text, EIO);
+        }
+        return true;
+    }
+
+    ExpectBool Peer::handle_read(const std::map<std::string, std::string>& kv)
+    {
+        auto respond_fail = [&](const std::string& directory, const std::string& rpath, const std::string& text) -> ExpectBool
+        {
+            ReadResponse rsp;
+            rsp.directory = directory;
+            rsp.rpath = rpath;
+            rsp.ok = false;
+            rsp.text = flatten(text);
+            std::vector<uint8_t> wire;
+            if (auto r = convertToWire(rsp, wire); !r)
+            {
+                return r;
+            }
+            return send(wire.data(), wire.size());
+        };
+
+        ReadRequest req;
+        if (auto r = convertFromWire(kv, req); !r)
+        {
+            return respond_fail("", "", r.error().err);
+        }
+
+        FileOps ops;
+        auto ctx = ops.ropen(req.directory, req.rpath);
+        if (!ctx)
+        {
+            return respond_fail(req.directory, req.rpath, ctx.error().err);
+        }
+
+        auto chunk = std::make_unique<Chunk>();
+        std::vector<uint8_t> wire;
+        for (;;)
+        {
+            auto more = ops.read(*ctx, *chunk);
+            if (!more)
+            {
+                return respond_fail(req.directory, req.rpath, more.error().err);
+            }
+            // See write_file: an empty file is a single empty chunk, otherwise
+            // the last data chunk (the one carrying the hash) ends the file.
+            if (chunk->chunk_size > 0 || ctx->total_size == 0)
+            {
+                chunk->directory = req.directory;
+                if (auto r = convertToWire(*chunk, wire); !r)
+                {
+                    return respond_fail(req.directory, req.rpath, r.error().err);
+                }
+                if (auto r = send(wire.data(), wire.size()); !r)
+                {
+                    return r;
+                }
+            }
+            if (!chunk->hash.empty())
+            {
+                break;
+            }
+        }
+        if (ctx->bytes_done != ctx->total_size)
+        {
+            return respond_fail(req.directory, req.rpath, req.rpath + " changed while it was being read");
+        }
+
+        ReadResponse rsp;
+        rsp.directory = req.directory;
+        rsp.rpath = req.rpath;
+        rsp.hash = chunk->hash;
+        rsp.mtime = ctx->mtime;
+        rsp.permission = ctx->permission;
+        if (auto r = convertToWire(rsp, wire); !r)
+        {
+            return respond_fail(req.directory, req.rpath, r.error().err);
+        }
+        return send(wire.data(), wire.size());
+    }
+
+    ExpectBool Peer::handle_write(const std::map<std::string, std::string>& kv)
+    {
+        static constexpr char NAME[] = "handle_write";
+        std::vector<uint8_t> wire;
+        auto respond = [&](const std::string& directory, const std::string& rpath, const std::string& error) -> ExpectBool
+        {
+            WriteResponse rsp;
+            rsp.directory = directory;
+            rsp.rpath = rpath;
+            rsp.ok = error.empty();
+            rsp.text = flatten(error);
+            if (auto r = convertToWire(rsp, wire); !r)
+            {
+                return r;
+            }
+            return send(wire.data(), wire.size());
+        };
+
+        WriteRequest req;
+        if (auto r = convertFromWire(kv, req); !r)
+        {
+            // How much data follows is unknown, so the stream can't be resynchronized.
+            auto dir = kv.find("directory");
+            auto file = kv.find("file");
+            respond(dir == kv.end() ? "" : dir->second, file == kv.end() ? "" : file->second, r.error().err);
+            return r;
+        }
+
+        FileOps ops;
+        std::string error; // set once the write has failed; the chunks are then just consumed
+        std::optional<IOContext> ctx;
+        if (auto opened = ops.wopen(req.directory, req.rpath, req.total_size, req.hash, req.mtime, req.permission); opened)
+        {
+            ctx.emplace(std::move(*opened));
+        }
+        else
+        {
+            error = opened.error().err;
+        }
+
+        auto chunk = std::make_unique<Chunk>();
+        size_t received = 0;
+        do
+        {
+            std::string command;
+            std::map<std::string, std::string> ckv;
+            std::vector<uint8_t> data;
+            if (auto r = read_command(*this, command, ckv, data); !r)
+            {
+                discard(ctx);
+                return r;
+            }
+            if (command != "DATA-CHUNK")
+            {
+                discard(ctx);
+                return fail(NAME, "expected DATA-CHUNK for " + req.rpath + ", got " + command, EPROTO);
+            }
+            if (auto r = convertFromWire(ckv, data, *chunk); !r)
+            {
+                discard(ctx);
+                return r;
+            }
+            if (error.empty())
+            {
+                if (chunk->rpath != req.rpath || chunk->total_size != req.total_size)
+                {
+                    error = "DATA-CHUNK does not match REQ-WRITE for " + req.rpath;
+                }
+                else if (auto more = ops.write(*ctx, *chunk); !more)
+                {
+                    error = more.error().err;
+                }
+            }
+            received += chunk->chunk_size;
+        } while (received < req.total_size);
+
+        if (error.empty())
+        {
+            if (auto r = ops.rename(req.directory, req.rpath); !r)
+            {
+                error = r.error().err;
+            }
+        }
+        if (!error.empty())
+        {
+            discard(ctx);
+        }
+        return respond(req.directory, req.rpath, error);
     }
 }

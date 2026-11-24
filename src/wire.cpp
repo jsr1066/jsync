@@ -1,5 +1,6 @@
 #include "wire.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -216,6 +217,86 @@ namespace jsync_ns
         return frame(body, out);
     }
 
+    ExpectBool convertToWire(const ReadRequest& req, std::vector<uint8_t>& out)
+    {
+        std::string body;
+        for (auto r : {
+                 append_kv(body, "cmd", "REQ-READ"),
+                 append_kv(body, "directory", req.directory),
+                 append_kv(body, "file", req.rpath),
+             })
+        {
+            if (!r)
+            {
+                return r;
+            }
+        }
+        return frame(body, out);
+    }
+
+    ExpectBool convertToWire(const WriteResponse& rsp, std::vector<uint8_t>& out)
+    {
+        std::string body;
+        for (auto r : {
+                 append_kv(body, "cmd", "RSP-WRITE"),
+                 append_kv(body, "directory", rsp.directory),
+                 append_kv(body, "file", rsp.rpath),
+                 append_kv(body, "status", rsp.ok ? "complete" : "fail"),
+             })
+        {
+            if (!r)
+            {
+                return r;
+            }
+        }
+        if (!rsp.text.empty())
+        {
+            if (auto r = append_kv(body, "text", rsp.text); !r)
+            {
+                return r;
+            }
+        }
+        return frame(body, out);
+    }
+
+    ExpectBool convertToWire(const Chunk& chunk, std::vector<uint8_t>& out)
+    {
+        if (chunk.chunk_size > MAX_CHUNK)
+        {
+            return fail("chunk too large: " + std::to_string(chunk.chunk_size), EMSGSIZE);
+        }
+        std::string body;
+        for (auto r : {
+                 append_kv(body, "cmd", "DATA-CHUNK"),
+                 append_kv(body, "directory", chunk.directory),
+                 append_kv(body, "file", chunk.rpath),
+                 append_kv(body, "total_size", std::to_string(chunk.total_size)),
+                 append_kv(body, "chunk_size", std::to_string(chunk.chunk_size)),
+                 append_kv(body, "mtime", std::to_string(static_cast<long long>(chunk.mtime))),
+                 append_kv(body, "permission", std::to_string(chunk.permission)),
+                 append_kv(body, "status", "continue"),
+             })
+        {
+            if (!r)
+            {
+                return r;
+            }
+        }
+        if (!chunk.hash.empty())
+        {
+            if (auto r = append_kv(body, "hash", chunk.hash); !r)
+            {
+                return r;
+            }
+        }
+        if (auto r = frame(body, out); !r)
+        {
+            return r;
+        }
+        out.insert(out.end(), chunk.bytes, chunk.bytes + chunk.chunk_size);
+        return true;
+    }
+
     ExpectBool convertToWire(const WriteRequest& req, std::vector<uint8_t>& out)
     {
         std::string body;
@@ -404,6 +485,75 @@ namespace jsync_ns
             rsp.hash = *hash;
         }
         out = std::move(rsp);
+        return true;
+    }
+
+    ExpectBool convertFromWire(const KeyValues& kv, ReadRequest& out)
+    {
+        std::string err;
+        const std::string* dir = need(kv, "directory", err);
+        const std::string* file = dir ? need(kv, "file", err) : nullptr;
+        if (!file)
+        {
+            return fail("REQ-READ: " + err, EPROTO);
+        }
+        out.directory = *dir;
+        out.rpath = *file;
+        return true;
+    }
+
+    ExpectBool convertFromWire(const KeyValues& kv, WriteResponse& out)
+    {
+        std::string err;
+        WriteResponse rsp;
+        const std::string* dir = need(kv, "directory", err);
+        const std::string* file = dir ? need(kv, "file", err) : nullptr;
+        if (!file || !get_status(kv, rsp.ok, err))
+        {
+            return fail("RSP-WRITE: " + err, EPROTO);
+        }
+        rsp.directory = *dir;
+        rsp.rpath = *file;
+        rsp.text = optional(kv, "text");
+        out = std::move(rsp);
+        return true;
+    }
+
+    ExpectBool convertFromWire(const KeyValues& kv, const std::vector<uint8_t>& data, Chunk& out)
+    {
+        std::string err;
+        size_t total_size = 0, chunk_size = 0;
+        time_t mtime = 0;
+        int permission = 0;
+        const std::string* dir = need(kv, "directory", err);
+        const std::string* file = dir ? need(kv, "file", err) : nullptr;
+        if (!file || !get_size(kv, "total_size", total_size, err) || !get_size(kv, "chunk_size", chunk_size, err)
+            || !get_mtime(kv, mtime, err) || !get_permission(kv, permission, err))
+        {
+            return fail("DATA-CHUNK: " + err, EPROTO);
+        }
+        if (optional(kv, "status") != "continue")
+        {
+            return fail("DATA-CHUNK: bad status: " + optional(kv, "status"), EPROTO);
+        }
+        if (chunk_size > MAX_CHUNK || chunk_size != data.size())
+        {
+            return fail("DATA-CHUNK: chunk_size " + std::to_string(chunk_size) + " does not match the "
+                            + std::to_string(data.size()) + " bytes received", EPROTO);
+        }
+        const std::string hash = optional(kv, "hash");
+        if (!hash.empty() && !is_sha1_hex(hash))
+        {
+            return fail("DATA-CHUNK: bad hash: " + hash, EPROTO);
+        }
+        out.directory = *dir;
+        out.rpath = *file;
+        out.total_size = total_size;
+        out.chunk_size = chunk_size;
+        out.mtime = mtime;
+        out.permission = permission;
+        out.hash = hash;
+        std::copy(data.begin(), data.end(), out.bytes);
         return true;
     }
 }

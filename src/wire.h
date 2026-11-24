@@ -34,6 +34,16 @@ namespace jsync_ns
     // Builds a DATA-SCAN entry (one per file, status=continue).
     ExpectBool convertToWire(const ScanInfo&, std::vector<uint8_t>& out);
 
+    // Builds a REQ-READ: directory and file, both mandatory.
+    ExpectBool convertToWire(const ReadRequest&, std::vector<uint8_t>& out);
+
+    // Builds an RSP-WRITE: status=complete or status=fail with text if non-empty.
+    ExpectBool convertToWire(const WriteResponse&, std::vector<uint8_t>& out);
+
+    // Builds a DATA-CHUNK: the message followed immediately by the chunk's
+    // chunk_size bytes. hash is sent only if the chunk has one (the final chunk).
+    ExpectBool convertToWire(const Chunk&, std::vector<uint8_t>& out);
+
     // Builds a REQ-WRITE: directory, file, hash, total_size, mtime and permission,
     // all mandatory.
     ExpectBool convertToWire(const WriteRequest&, std::vector<uint8_t>& out);
@@ -59,6 +69,16 @@ namespace jsync_ns
 
     // RSP-SCAN: status=complete|fail, text optional.
     ExpectBool convertFromWire(const KeyValues&, ScanResponse&);
+
+    // REQ-READ: directory, file.
+    ExpectBool convertFromWire(const KeyValues&, ReadRequest&);
+
+    // RSP-WRITE: directory, file, status=complete|fail, text optional.
+    ExpectBool convertFromWire(const KeyValues&, WriteResponse&);
+
+    // DATA-CHUNK: data is the chunk bytes read_command collected; its size must
+    // equal chunk_size. hash is optional (final chunk only).
+    ExpectBool convertFromWire(const KeyValues&, const std::vector<uint8_t>& data, Chunk&);
 
     // REQ-WRITE: directory, file, hash (40 lowercase hex), total_size, mtime, permission.
     ExpectBool convertFromWire(const KeyValues&, WriteRequest&);

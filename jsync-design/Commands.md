@@ -118,8 +118,11 @@ The server will sent these messages repeatedly until all data has been sent
 | file=\<relative-path\> | Mandatory |
 | total_size=\<size\>    | Mandatory |
 | chunk_size=\<size\>    | Mandatory |
+| mtime=\<mtime\>        | Mandatory. Same on every chunk; lets the receiver open the file on the first one |
+| permission=\<perm\>    | Mandatory. As mtime |
+| hash=\<hash\>          | Only on the final chunk, the one that completes the file |
 | status=continue        | Mandatory |
-Chunk data immediatly follows this message
+Chunk data immediatly follows this message. An empty file is sent as one chunk with chunk_size=0 (carrying the hash); otherwise no empty chunk is sent.
 
 ## Response
 | kv                     | Notes     |

@@ -43,6 +43,33 @@ namespace jsync_ns
         // Reads exactly n bytes; an error is returned if the stream ends first.
         ExpectBool receive(void* buf, size_t n);
 
+        // Client side: copies server_dir/rpath to local_dir/rpath. Sends REQ-READ
+        // and writes the DATA-CHUNKs to a temp file; once RSP-READ confirms the
+        // hash, mtime and permission it renames the file into place. A failure
+        // reported by the server (RSP-READ status=fail) leaves the connection
+        // usable; any other error means the stream is out of step and the
+        // connection should be closed. The temp file is removed on error.
+        ExpectBool read_file(const std::string& server_dir, const std::string& local_dir, const std::string& rpath);
+
+        // Client side: copies local_dir/rpath to server_dir/rpath. Sends REQ-WRITE
+        // and the DATA-CHUNKs, then waits for RSP-WRITE. A failure reported by the
+        // server leaves the connection usable; a local read error part way through
+        // does not (the server is left waiting for data).
+        ExpectBool write_file(const std::string& local_dir, const std::string& server_dir, const std::string& rpath);
+
+        // Server side: answers a REQ-READ whose key/value pairs read_command
+        // returned, sending DATA-CHUNKs then RSP-READ. A request that cannot be
+        // satisfied is answered with RSP-READ status=fail and counts as handled;
+        // an error is returned only if the connection itself fails.
+        ExpectBool handle_read(const std::map<std::string, std::string>& kv);
+
+        // Server side: answers a REQ-WRITE by receiving its DATA-CHUNKs (reading
+        // them from the stream), then replies RSP-WRITE. If the file cannot be
+        // written the chunks are still consumed so the stream stays in step, and
+        // RSP-WRITE status=fail is sent. An error is returned only if the
+        // connection fails or the request is too malformed to know how much data follows.
+        ExpectBool handle_write(const std::map<std::string, std::string>& kv);
+
         bool is_connected() const;
 
         // Closes the stream (giving the remote EOF) and reaps any spawned child.

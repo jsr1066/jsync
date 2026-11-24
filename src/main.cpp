@@ -149,16 +149,10 @@ namespace
         }
     }
 
-    int test_scan_server(Peer& peer)
+    // Answers a REQ-SCAN whose key/value pairs have already been read.
+    int handle_scan(Peer& peer, std::map<std::string, std::string>& kv)
     {
-        std::string command;
-        std::map<std::string, std::string> kv;
-        std::vector<uint8_t> chunk;
-        if (!read_command(peer, command, kv, chunk))
-        {
-            return 1;
-        }
-        if (command != "REQ-SCAN" || !kv.contains("directory"))
+        if (!kv.contains("directory"))
         {
             send_scan_response(peer, false, "expected REQ-SCAN with directory");
             return 1;
@@ -208,6 +202,64 @@ namespace
         return 0;
     }
 
+    int test_scan_server(Peer& peer)
+    {
+        std::string command;
+        std::map<std::string, std::string> kv;
+        std::vector<uint8_t> chunk;
+        if (!read_command(peer, command, kv, chunk))
+        {
+            return 1;
+        }
+        if (command != "REQ-SCAN")
+        {
+            send_scan_response(peer, false, "expected REQ-SCAN with directory");
+            return 1;
+        }
+        return handle_scan(peer, kv);
+    }
+
+    // Server loop: answers requests until the client disconnects or the stream breaks.
+    int serve(Peer& peer)
+    {
+        for (;;)
+        {
+            std::string command;
+            std::map<std::string, std::string> kv;
+            std::vector<uint8_t> chunk;
+            if (!read_command(peer, command, kv, chunk))
+            {
+                return 0; // EOF: the client is done
+            }
+            if (command == "REQ-SCAN")
+            {
+                if (handle_scan(peer, kv) != 0)
+                {
+                    return 1;
+                }
+            }
+            else if (command == "REQ-READ")
+            {
+                if (!peer.handle_read(kv))
+                {
+                    return 1;
+                }
+            }
+            else if (command == "REQ-WRITE")
+            {
+                if (!peer.handle_write(kv))
+                {
+                    return 1;
+                }
+            }
+            else
+            {
+                spdlog::error("serve: unexpected command {}", command);
+                return 1;
+            }
+        }
+    }
+
     int test_scan(const Options& opts)
     {
         Peer peer;
@@ -255,10 +307,7 @@ namespace
             {
                 return 1;
             }
-            while (test_scan_server(peer) == 0)
-            {
-            }
-            return 0;
+            return serve(peer);
         }
 
         Database db;
