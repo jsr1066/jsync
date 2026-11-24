@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -42,6 +43,9 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
         return false;
     }
     total = ctx->total_size;
+    struct stat st;
+    CHECK(::stat((fs::path(dir) / rpath).c_str(), &st) == 0);
+    CHECK(ctx->mtime == st.st_mtime);
     auto chunk = std::make_unique<Chunk>();
     out.clear();
     hash.clear();
@@ -65,6 +69,7 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
         CHECK(chunk->rpath == rpath);
         CHECK(chunk->directory == dir);
         CHECK(chunk->total_size == total);
+        CHECK(chunk->mtime == st.st_mtime);
         out.append(chunk->bytes, chunk->chunk_size);
         chunks++;
         // The hash is only reported on the chunk that completes the file.

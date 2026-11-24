@@ -21,7 +21,9 @@ Excluded files are absent from L and S, and their files rows are removed by
 
 Single-file sync items are not handled yet.
 
-## Known issue
-`FileOps::rename` does not preserve mtime, but the files table stores one mtime per file.
-After a transfer the destination's mtime differs from the source's, so the size+mtime test
-can misreport changes. To be fixed with the executor (preserve mtime on rename, or store both).
+## mtime preservation
+A transferred file keeps the source's mtime (whole seconds), so the same value is stored for
+both sides and the size+mtime test stays exact; no clock-drift tolerance is needed.
+`FileOps::wopen` takes the mtime, `FileOps::write` applies it to the temp file once the hash
+verifies, and `rename(2)` preserves it. `ropen`/`read` report the source mtime in
+`IOContext::mtime` / `Chunk::mtime`.

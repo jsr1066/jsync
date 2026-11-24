@@ -10,6 +10,7 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <spdlog/spdlog.h>
 
@@ -202,6 +203,7 @@ namespace jsync_ns
         context.directory = directory;
         context.rpath = rpath;
         context.total_size = static_cast<size_t>(st.st_size);
+        context.mtime = st.st_mtime;
         return context;
     }
 
@@ -211,6 +213,7 @@ namespace jsync_ns
         chunk.directory = context.directory;
         chunk.rpath = context.rpath;
         chunk.total_size = context.total_size;
+        chunk.mtime = context.mtime;
         chunk.chunk_size = 0;
         chunk.hash.clear();
 
@@ -253,9 +256,9 @@ namespace jsync_ns
     }
 
     ExpectIOContext FileOps::wopen(const std::string& directory, const std::string& rpath,
-                                    size_t total_size, const std::string& expected_hash)
+                                    size_t total_size, const std::string& expected_hash, time_t mtime)
     {
-        spdlog::info("wopen: directory={} rpath={} total_size={}", directory, rpath, total_size);
+        spdlog::info("wopen: directory={} rpath={} total_size={} mtime={}", directory, rpath, total_size, static_cast<long long>(mtime));
 
         auto resolved = resolve_path(directory, rpath);
         if (!resolved)
@@ -282,6 +285,7 @@ namespace jsync_ns
         context.directory = directory;
         context.rpath = rpath;
         context.total_size = total_size;
+        context.mtime = mtime;
         context.expected_hash = expected_hash;
         context.temp_path = temp.string();
         return context;
@@ -332,6 +336,17 @@ namespace jsync_ns
             context.fd = -1;
             ::unlink(context.temp_path.c_str());
             return fail("write", Error{"hash mismatch on " + context.rpath + ": expected " + context.expected_hash + ", got " + actual, EBADMSG, ErrorKind::Errno});
+        }
+        // Set the source's mtime on the temp file; rename(2) preserves it. This
+        // must come after the last write, which would otherwise bump it.
+        struct timeval times[2] = {{context.mtime, 0}, {context.mtime, 0}};
+        if (::futimes(context.fd, times) != 0)
+        {
+            int code = errno;
+            ::close(context.fd);
+            context.fd = -1;
+            ::unlink(context.temp_path.c_str());
+            return fail("write", Error{"cannot set mtime on " + context.temp_path + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         if (::fsync(context.fd) != 0 || ::close(context.fd) != 0)
         {
