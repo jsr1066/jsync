@@ -21,9 +21,9 @@ Excluded files are absent from L and S, and their files rows are removed by
 
 Single-file sync items are not handled yet.
 
-## mtime preservation
+## mtime and permission preservation
 A transferred file keeps the source's mtime (whole seconds), so the same value is stored for
 both sides and the size+mtime test stays exact; no clock-drift tolerance is needed.
-`FileOps::wopen` takes the mtime, `FileOps::write` applies it to the temp file once the hash
-verifies, and `rename(2)` preserves it. `ropen`/`read` report the source mtime in
-`IOContext::mtime` / `Chunk::mtime`.
+`FileOps::wopen` takes the mtime and permission, `FileOps::write` applies them to the temp
+file once the hash verifies (setuid/setgid/sticky are masked off), and `rename(2)` preserves
+it. `ropen`/`read` report the source mtime and permission in `IOContext` / `Chunk`.

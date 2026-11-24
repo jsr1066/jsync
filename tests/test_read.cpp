@@ -46,6 +46,7 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
     struct stat st;
     CHECK(::stat((fs::path(dir) / rpath).c_str(), &st) == 0);
     CHECK(ctx->mtime == st.st_mtime);
+    CHECK(ctx->permission == static_cast<int>(st.st_mode & 07777));
     auto chunk = std::make_unique<Chunk>();
     out.clear();
     hash.clear();
@@ -70,6 +71,7 @@ static bool read_all(FileOps& cmd, const std::string& dir, const std::string& rp
         CHECK(chunk->directory == dir);
         CHECK(chunk->total_size == total);
         CHECK(chunk->mtime == st.st_mtime);
+        CHECK(chunk->permission == static_cast<int>(st.st_mode & 07777));
         out.append(chunk->bytes, chunk->chunk_size);
         chunks++;
         // The hash is only reported on the chunk that completes the file.

@@ -67,7 +67,7 @@ int main()
     // Multi-chunk write into a new subdirectory.
     {
         std::string data = make_data(MAX_CHUNK * 2 + 123);
-        auto ctx = cmd.wopen(dir, "sub/big", data.size(), sha_of(data), 1700000000);
+        auto ctx = cmd.wopen(dir, "sub/big", data.size(), sha_of(data), 1700000000, 0640);
         CHECK(ctx.has_value());
         auto r = write_all(cmd, *ctx, data, MAX_CHUNK);
         CHECK(r.has_value() && !*r);
@@ -79,7 +79,7 @@ int main()
     // Small odd-sized pieces.
     {
         std::string data = make_data(1000);
-        auto ctx = cmd.wopen(dir, "small", data.size(), sha_of(data), 1700000000);
+        auto ctx = cmd.wopen(dir, "small", data.size(), sha_of(data), 1700000000, 0640);
         CHECK(ctx.has_value());
         auto r = write_all(cmd, *ctx, data, 77);
         CHECK(r.has_value() && !*r);
@@ -88,7 +88,7 @@ int main()
 
     // Empty file: a single empty chunk completes it.
     {
-        auto ctx = cmd.wopen(dir, "empty", 0, sha_of(""), 1700000000);
+        auto ctx = cmd.wopen(dir, "empty", 0, sha_of(""), 1700000000, 0640);
         CHECK(ctx.has_value());
         auto r = write_all(cmd, *ctx, "", 1);
         CHECK(r.has_value() && !*r);
@@ -98,7 +98,7 @@ int main()
     // Hash mismatch removes the temp file.
     {
         std::string data = make_data(500);
-        auto ctx = cmd.wopen(dir, "bad", data.size(), sha_of("other"), 1700000000);
+        auto ctx = cmd.wopen(dir, "bad", data.size(), sha_of("other"), 1700000000, 0640);
         CHECK(ctx.has_value());
         auto r = write_all(cmd, *ctx, data, 500);
         CHECK(!r.has_value());
@@ -108,7 +108,7 @@ int main()
     // Writing more than total_size is rejected.
     {
         std::string data = make_data(100);
-        auto ctx = cmd.wopen(dir, "over", 50, sha_of(data), 1700000000);
+        auto ctx = cmd.wopen(dir, "over", 50, sha_of(data), 1700000000, 0640);
         CHECK(ctx.has_value());
         auto r = write_all(cmd, *ctx, data, 100);
         CHECK(!r.has_value());
@@ -121,9 +121,10 @@ int main()
         CHECK(r.has_value() && *r);
         CHECK(!fs::exists(root / ".small.jsync.tmp"));
         CHECK(slurp(root / "small") == make_data(1000));
-        // The mtime given to wopen survives write() and rename().
+        // The mtime and permission given to wopen survives write() and rename().
         struct stat st;
         CHECK(::stat((root / "small").c_str(), &st) == 0 && st.st_mtime == 1700000000);
+        CHECK((st.st_mode & 07777) == 0640);
 
         r = cmd.rename(dir, "sub/big");
         CHECK(r.has_value());
@@ -138,9 +139,9 @@ int main()
     CHECK(!cmd.rename(dir, "").has_value());
 
     // wopen() path errors.
-    CHECK(!cmd.wopen(dir, "../x", 0, "", 0).has_value());
-    CHECK(!cmd.wopen(dir, "/etc/x", 0, "", 0).has_value());
-    CHECK(!cmd.wopen(dir, "", 0, "", 0).has_value());
+    CHECK(!cmd.wopen(dir, "../x", 0, "", 0, 0).has_value());
+    CHECK(!cmd.wopen(dir, "/etc/x", 0, "", 0, 0).has_value());
+    CHECK(!cmd.wopen(dir, "", 0, "", 0, 0).has_value());
 
     fs::remove_all(root);
     if (failures == 0)

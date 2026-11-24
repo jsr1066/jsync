@@ -27,15 +27,16 @@ namespace jsync_ns
 
         // Opens a temp file next to directory/rpath for writing (creating parent
         // directories as needed). The file must end up total_size bytes long with
-        // SHA-1 expected_hash, and mtime (whole seconds) is applied to it once
-        // the hash verifies, so the renamed file carries the source's mtime.
+        // SHA-1 expected_hash. The mtime (whole seconds) and permission bits are
+        // applied once the hash verifies, so the renamed file carries the source's.
+        // The setuid, setgid and sticky bits are never applied.
         // The returned context owns the fd and closes it when destroyed.
         ExpectIOContext wopen(const std::string& directory, const std::string& rpath,
-                              size_t total_size, const std::string& expected_hash, time_t mtime);
+                              size_t total_size, const std::string& expected_hash, time_t mtime, int permission);
 
         // Appends the data in chunk to the temp file and updates the running hash.
         // Returns true if more data is expected. Once total_size bytes have been
-        // written it verifies the hash, sets the mtime and returns false; on a mismatch the temp
+        // written it verifies the hash, sets the mtime and permission and returns false; on a mismatch the temp
         // file is removed and an error is returned.
         ExpectBool write(IOContext& context, const Chunk& chunk);
 

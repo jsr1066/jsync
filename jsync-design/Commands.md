@@ -129,6 +129,7 @@ Chunk data immediatly follows this message
 | file=\<relative-path\> | Mandatory |
 | hash=\<hash\>          | Mandatory if status\=\=complete |
 | mtime=\<mtime\>        | Mandatory if status\=\=complete. Client applies it to the written file |
+| permission=\<perm\>    | Mandatory if status\=\=complete. Applied like mtime |
 | status=\<complete\|fail\>    | Mandatory |
 | test=\<text\>        | Optional, error text |
 
@@ -143,6 +144,7 @@ This is a request to transfer a file from the client to the server.
 |file=\<relative-path\>|Mandatory|
 |hash=\<hash\> | Mandatory|
 |mtime=\<mtime\> | Mandatory. Applied to the file once the hash verifies|
+|permission=\<perm\> | Mandatory. Applied with mtime; setuid/setgid/sticky bits are ignored|
 
 ## data
 See READ for the data chunk

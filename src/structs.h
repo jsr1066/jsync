@@ -101,6 +101,8 @@ namespace jsync_ns
         // Modification time (whole seconds). ropen fills it from the file; wopen
         // takes it from the caller and write() applies it to the temp file.
         time_t mtime = 0;
+        // Permission bits (st_mode & 07777), handled like mtime.
+        int permission = 0;
 
         // The bytes and running hash accumulated so far (read and write). Write
         // only: the hash the finished file must have, and the temp file being
@@ -119,6 +121,7 @@ namespace jsync_ns
             , rpath(std::move(other.rpath))
             , total_size(other.total_size)
             , mtime(other.mtime)
+            , permission(other.permission)
             , expected_hash(std::move(other.expected_hash))
             , bytes_done(other.bytes_done)
             , sha(other.sha)
@@ -139,6 +142,7 @@ namespace jsync_ns
                 rpath = std::move(other.rpath);
                 total_size = other.total_size;
                 mtime = other.mtime;
+                permission = other.permission;
                 expected_hash = std::move(other.expected_hash);
                 bytes_done = other.bytes_done;
                 sha = other.sha;
@@ -165,6 +169,7 @@ namespace jsync_ns
         size_t total_size;
         size_t chunk_size;
         time_t mtime = 0; // modification time of the file being read
+        int permission = 0; // permission bits of the file being read
         // Set by FileOps::read once the whole file has been read (the chunk that
         // reaches total_size); empty otherwise.
         std::string hash;

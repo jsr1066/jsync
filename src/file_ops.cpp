@@ -204,6 +204,7 @@ namespace jsync_ns
         context.rpath = rpath;
         context.total_size = static_cast<size_t>(st.st_size);
         context.mtime = st.st_mtime;
+        context.permission = static_cast<int>(st.st_mode & 07777);
         return context;
     }
 
@@ -214,6 +215,7 @@ namespace jsync_ns
         chunk.rpath = context.rpath;
         chunk.total_size = context.total_size;
         chunk.mtime = context.mtime;
+        chunk.permission = context.permission;
         chunk.chunk_size = 0;
         chunk.hash.clear();
 
@@ -256,9 +258,9 @@ namespace jsync_ns
     }
 
     ExpectIOContext FileOps::wopen(const std::string& directory, const std::string& rpath,
-                                    size_t total_size, const std::string& expected_hash, time_t mtime)
+                                    size_t total_size, const std::string& expected_hash, time_t mtime, int permission)
     {
-        spdlog::info("wopen: directory={} rpath={} total_size={} mtime={}", directory, rpath, total_size, static_cast<long long>(mtime));
+        spdlog::info("wopen: directory={} rpath={} total_size={} mtime={} permission={:o}", directory, rpath, total_size, static_cast<long long>(mtime), permission);
 
         auto resolved = resolve_path(directory, rpath);
         if (!resolved)
@@ -286,6 +288,7 @@ namespace jsync_ns
         context.rpath = rpath;
         context.total_size = total_size;
         context.mtime = mtime;
+        context.permission = permission;
         context.expected_hash = expected_hash;
         context.temp_path = temp.string();
         return context;
@@ -347,6 +350,15 @@ namespace jsync_ns
             context.fd = -1;
             ::unlink(context.temp_path.c_str());
             return fail("write", Error{"cannot set mtime on " + context.temp_path + ": " + std::strerror(code), code, ErrorKind::Errno});
+        }
+        // Never apply setuid/setgid/sticky bits received from the peer.
+        if (::fchmod(context.fd, static_cast<mode_t>(context.permission & 0777)) != 0)
+        {
+            int code = errno;
+            ::close(context.fd);
+            context.fd = -1;
+            ::unlink(context.temp_path.c_str());
+            return fail("write", Error{"cannot set permission on " + context.temp_path + ": " + std::strerror(code), code, ErrorKind::Errno});
         }
         if (::fsync(context.fd) != 0 || ::close(context.fd) != 0)
         {
